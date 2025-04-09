@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session, selectinload
 from typing import List, Dict, Any, Optional
 
 from app.models.structure import SceneStatus
-from app.schemas import SceneUpdate
+from app.schemas import SceneUpdate, ChapterUpdate
 from app.schemas.scene import SceneUpdateGenerated
-from app.services import llm_service, scene_service
+from app.services import llm_service, scene_service, chapter_service
 
 
 # --- 检索函数 ---
@@ -480,4 +480,86 @@ async def generate_scene_content_rag(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred during scene generation: {e}"
+        )
+
+
+# --- Core RAG Service Function ---
+async def generate_chapter_content(
+        db: Session,
+        chapter_id: int
+) -> Chapter:
+
+    system_prompt = """
+# 小说章节整合与深度扩写任务
+请将下方提供的几个文本片段，按照它们提供的顺序，整合并深度扩写成一个**连贯流畅、内容丰富**的单一章节。
+
+**目标：**
+
+1.  **整合与衔接：** 将所有提供的片段无缝融合，确保情节、时间、逻辑和人物状态的**自然过渡与连贯性**。补充必要的过渡性描写和心理活动，使得原本分离的片段读起来像一个有机的整体。
+2.  **深度扩写：** 在**严格保持原有核心剧情事件和发展顺序不变**的前提下，对内容进行大幅度扩充，目标字数达到 **[8000字左右]**。扩写的重点在于：
+    *   **丰富细节：** 增加环境描写的层次感、感官细节（视觉、听觉、嗅觉、触觉等）、动作描写的具体过程。
+    *   **深化人物：** 深入挖掘角色的内心世界，补充其在各个场景下的心理活动、情绪变化、思考、回忆闪现、动机挣扎等。
+    *   **强化氛围：** 根据不同片段的基调，着力渲染所需的情绪氛围（例如：紧张、悬疑、悲伤、激昂、宁静、压抑等）。
+    *   **增强张力：** 对于冲突、关键转折或高潮部分，适当放慢节奏，增加铺垫和细节描写，提升戏剧张力。
+3.  **避免冗余：** 扩写应追求**有意义的丰富**，而非简单的词语堆砌或情节重复。确保新增内容服务于情节推进、人物塑造或氛围营造。避免空洞的形容词滥用和无意义的拉长句子。
+4.  **保持核心剧情：** **绝对不允许**修改原有片段中的关键情节、事件结果、核心设定或人物关系。扩写是在原有骨架上填充血肉，而不是改变骨架。
+5.  **文风要求：** 整体文风需**引人入胜，富有表现力**。请根据各片段内容，自然调整叙事节奏和语言风格，力求让读者获得沉浸式的阅读体验（即“读得爽”）
+6.  **输出格式：** **请严格仅输出最终整合扩写后的小说章节正文。** 不要包含任何关于你执行了哪些操作的说明、对提示词的分析、诸如【扩写部分】之类的标记，或任何非小说正文的内容。
+            """
+
+
+    # 1. Fetch the Chapter
+    chapter = chapter_service.get_chapter(db, chapter_id=chapter_id)
+
+    if not chapter:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chapter with id {chapter_id} not found.")
+    if not chapter.project_id:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Chapter {chapter_id} is missing project association.")
+
+    try:
+        # 2. Build Prompt
+        if not chapter.scenes:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"Chapter {chapter_id} has no scenes defined. Cannot generate content.")
+
+        prompt = ""
+        for scene in chapter.scenes:
+            if scene.generated_content:
+                prompt += scene.generated_content + "\n"
+
+
+        print("\n--- Generated Prompt (truncated) ---")  # DEBUG
+        print(prompt[:1000] + "..." if len(prompt) > 1000 else prompt)  # DEBUG
+        print("--- End of Prompt ---\n")  # DEBUG
+
+        # 3. Call LLM to Generate Content
+        print("Calling LLM for scene content generation...")
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        generated_text = await llm_service.generate_text(messages, max_tokens=48000)
+        print("LLM generation complete.")
+        print("\n--- Generated Content (truncated) ---")  # DEBUG
+        print(generated_text[:500] + "..." if len(generated_text) > 500 else generated_text)  # DEBUG
+        print("--- End of Generated Content ---\n")  # DEBUG
+
+        # 4. Update Chapter in Database
+        chapter_update = ChapterUpdate(content=generated_text)
+
+        await chapter_service.update_chapter(db, db_chapter=chapter, chapter_in=chapter_update)
+
+        print(f"Successfully generated content and updated Chapter ID: {chapter_id}")
+        return chapter
+
+    except HTTPException as http_exc:
+        raise http_exc  # Re-raise HTTP exceptions from LLM service or validation
+    except Exception as e:
+        print(f"Error during RAG generation for chapter {chapter_id}: {e}")
+        import traceback
+        traceback.print_exc()  # Log the full traceback for debugging
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred during chapter generation: {e}"
         )

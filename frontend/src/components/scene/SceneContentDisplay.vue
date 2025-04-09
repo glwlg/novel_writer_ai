@@ -12,9 +12,9 @@
       <div v-if="loading" class="content-loading">
         <el-skeleton :rows="5" animated />
       </div>
-      <div v-else-if="!content && !readOnly" class="content-placeholder">
-          <el-empty description="还没有生成内容，可以点击上方按钮开始生成。"></el-empty>
-      </div>
+<!--      <div v-else-if="!content && !readOnly" class="content-placeholder">-->
+<!--          <el-empty description="还没有生成内容，可以点击上方按钮开始生成。"></el-empty>-->
+<!--      </div>-->
        <div v-else-if="!content && readOnly" class="content-placeholder">
           <el-text type="info">无生成内容。</el-text>
       </div>
@@ -38,7 +38,8 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
 import RichTextEditor from '@/components/common/RichTextEditor.vue';
-import {ElMessage} from "element-plus"; // 确保路径正确
+import {ElMessage} from "element-plus";
+import {MagicStick} from "@element-plus/icons-vue"; // 确保路径正确
 // import DOMPurify from 'dompurify'; // 如果需要清理 v-html 的内容
 
 // --- Props ---

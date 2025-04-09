@@ -100,10 +100,19 @@ const emit = defineEmits(['update:modelValue', 'blur', 'focus']);
 // --- Refs ---
 const editor = ref(null);
 
+const formatText = (text) => {
+  if (!text) {
+    return '';
+  }
+  // 使用正则表达式全局替换 \n 为 <br>
+  // 注意：要确保 HardBreak 扩展已启用，否则 <br> 可能被过滤掉
+  return text.replace(/\n/g, '<br>');
+};
+
 // --- Methods ---
 const setupEditor = () => {
   editor.value = new Editor({
-    content: props.modelValue,
+    content: formatText(props.modelValue),
     editable: !props.disabled,
     extensions: [
       StarterKit.configure({

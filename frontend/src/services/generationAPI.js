@@ -10,6 +10,14 @@ class GenerationAPI {
     generateSceneRAG = async (sceneId) => {
         return apiClient.post(`/scenes/${sceneId}/generate_rag`);
     };
+    /**
+     * 触发指定章节 内容生成
+     * @param {number} chapterId - 章节 ID
+     * @returns {Promise<object>} - 更新后的章节信息 (符合 ChapterRead schema)
+     */
+    generateChapterContent = async (chapterId) => {
+        return apiClient.post(`/chapter/${chapterId}/generate`);
+    };
 }
 
 const generationAPI = new GenerationAPI();

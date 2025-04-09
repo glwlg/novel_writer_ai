@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Path
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas import SceneRead  # Use the detailed read schema
-from app.services.rag_service import generate_scene_content_rag  # Import the core function
+from app.schemas import SceneRead, ChapterRead  # Use the detailed read schema
+from app.services.rag_service import generate_scene_content_rag, generate_chapter_content  # Import the core function
 
 router = APIRouter()
 
@@ -54,4 +54,33 @@ async def generate_scene_rag_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal server error occurred while generating scene content."
+        )
+
+@router.post(
+    "/chapter/{chapter_id}/generate",
+    response_model=ChapterRead, # Return the updated scene data
+    status_code=status.HTTP_200_OK,
+    summary="Generate chapter Content using AI",
+    tags=["Generation"] # Add a tag for Swagger UI grouping
+)
+async def generate_scene_rag_endpoint(
+    *, # Makes subsequent arguments keyword-only
+    db: Session = Depends(get_db),
+    chapter_id: int = Path(..., title="The ID of the scene to generate content for", ge=1)
+):
+    try:
+        updated_chapter = await generate_chapter_content(
+            db=db,
+            chapter_id=chapter_id
+        )
+        return updated_chapter
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        print(f"Unexpected error in generate_chapter_endpoint for chapter {chapter_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal server error occurred while generating chapter content."
         )

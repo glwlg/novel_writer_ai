@@ -21,6 +21,7 @@ class Chapter(Base):
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     title = Column(String, nullable=False)
     summary = Column(Text, nullable=True) # What happens in this chapter overall
+    content = Column(Text, nullable=True) # 完整小说内容
     order = Column(Integer, nullable=False, default=0) # Order within the project
     embedding = Column(Vector(1024), nullable=True) # Embedding of the summary for high-level context
     created_at = Column(DateTime(timezone=True), server_default=func.now())

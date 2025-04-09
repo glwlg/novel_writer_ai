@@ -18,6 +18,7 @@ class ChapterUpdate(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
     order: Optional[int] = None
+    content: Optional[str] = None # 完整小说内容
     # project_id 通常不允许修改
 
 class ChapterRead(ChapterBase):
@@ -28,6 +29,7 @@ class ChapterRead(ChapterBase):
     updated_at: Optional[datetime] = None
     # 嵌套显示该章节下的场景（简化信息）
     # 注意：需要在获取数据的查询中明确加载 scenes (e.g., using options(selectinload(Chapter.scenes)))
+    content: Optional[str] = None # 完整小说内容
     scenes: List[SceneReadMinimal] = []
 
     model_config = ConfigDict(from_attributes=True)

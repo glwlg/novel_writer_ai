@@ -50,11 +50,13 @@
                     }} 场景)</span>
                   <div class="chapter-actions">
                     <el-button link type="primary" :icon="Edit" @click.stop="openEditChapterDialog(chapter)"
-                               size="small"></el-button>
+                               size="default"></el-button>
                     <el-button link type="danger" :icon="Delete" @click.stop="confirmDeleteChapter(chapter)"
-                               size="small"></el-button>
+                               size="default"></el-button>
                     <el-button link type="success" :icon="DocumentAdd" @click.stop="openCreateSceneDialog(chapter.id)"
-                               size="small" title="在本章新建场景"></el-button>
+                               size="default" title="在本章新建场景"></el-button>
+                    <el-button link type="success" :icon="Document" @click.stop="openChapterDialog(chapter.id)"
+                               size="default" title="查看章节内容"></el-button>
                   </div>
                 </div>
                 <el-collapse-transition>
@@ -199,11 +201,38 @@
       </template>
     </el-dialog>
 
+    <!-- 对话框：小说内容 -->
+    <el-dialog v-model="chapterContentDialogVisible" :title="chapterStore.activeChapter?.title" width="60vw"
+               @closed="resetSceneForm">
+      <div v-if="isCreatingChapterContent" class="content-loading">
+        <el-skeleton :rows="5" animated/>
+      </div>
+      <div v-else>
+        <RichTextEditor
+            v-model="chapterStore.activeChapter.content"
+            :editorProps="{
+             attributes: {
+               class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl m-5 focus:outline-none',
+             },
+           }"
+        />
+      </div>
+      <template #footer>
+         <span class="dialog-footer">
+           <el-button :loading="isCreatingChapterContent" @click="chapterContentDialogVisible = false">取消</el-button>
+           <el-button type="primary" @click="triggerRAGGeneration" :loading="isCreatingChapterContent">
+              <el-icon><MagicStick/></el-icon>
+             内容优化
+           </el-button>
+         </span>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
 <script setup>
-import {ref, computed, onMounted, watch} from 'vue';
+import {computed, nextTick, onMounted, ref, watch} from 'vue';
 import {useRoute, useRouter} from 'vue-router';
 import {useChapterStore} from '@/store/chapter';
 import {useSceneStore} from '@/store/scene';
@@ -211,8 +240,8 @@ import {useProjectStore} from '@/store/project';
 import SceneItem from '@/components/scene/SceneItem.vue';
 import draggable from 'vuedraggable'; // 导入 draggable
 import {ElMessage, ElMessageBox} from 'element-plus';
-import {Plus, Edit, Delete, Rank, Place, DocumentAdd} from '@element-plus/icons-vue';
-import {nextTick} from 'vue';
+import {Delete, Document, DocumentAdd, Edit, MagicStick, Place, Plus, Rank} from '@element-plus/icons-vue';
+import RichTextEditor from "@/components/common/RichTextEditor.vue";
 
 // --- Router & Route ---
 const route = useRoute();
@@ -236,6 +265,10 @@ const sceneDialogVisible = ref(false);
 const sceneFormData = ref({title: '', goal: '', chapter_id: null, order_in_chapter: 0});
 const sceneFormRef = ref(null);
 const isCreatingScene = ref(false);
+
+const chapterContentDialogVisible = ref(false);
+const isCreatingChapterContent = ref(false);
+
 
 // --- Computed ---
 const isLoadingOverall = computed(() => chapterStore.isLoading || sceneStore.isLoadingUnassigned);
@@ -410,6 +443,21 @@ const confirmDeleteChapter = async (chapter) => {
 };
 
 // 场景操作
+const openChapterDialog = (chapterId = null) => {
+  const chapter = chapters.value.find(ch => ch.id === chapterId);
+  if (chapter) {
+    if (chapter.content) {
+
+    }
+  }
+
+  chapterStore.activeChapter = chapter;
+
+  chapterContentDialogVisible.value = true;
+
+};
+
+// 场景操作
 const openCreateSceneDialog = (chapterId = null) => {
   const targetChapter = chapters.value.find(ch => ch.id === chapterId);
   const defaultOrder = targetChapter ? (targetChapter.scenes?.length || 0) : 0; // 默认放到末尾
@@ -458,6 +506,30 @@ const createScene = async () => {
     isCreatingScene.value = false;
   }
 };
+
+const triggerRAGGeneration = async () => {
+  if (!chapterStore.activeChapter) return;
+  try {
+    await ElMessageBox.confirm(
+        '这将使用 AI 生成新的小说内容，可能会覆盖现有内容。是否继续？',
+        '确认生成',
+        {confirmButtonText: '生成', cancelButtonText: '取消', type: 'warning'}
+    );
+  } catch {
+    return; // 用户取消
+  }
+  isCreatingChapterContent.value = true;
+  try {
+    await chapterStore.generateChapterContent(chapterStore.activeChapter.id);
+    isCreatingChapterContent.value = false;
+    ElMessage.success('小说内容生成成功！');
+  } catch (err) {
+    // 错误信息已在 store 中设置，并会显示在 Alert 中
+    console.error('RAG generation failed:', err);
+    // ElMessage.error(`生成失败: ${sceneStore.generationError || '请稍后重试'}`);
+  }
+};
+
 
 // --- 拖拽处理 ---
 const onChapterDragEnd = async (event) => {
