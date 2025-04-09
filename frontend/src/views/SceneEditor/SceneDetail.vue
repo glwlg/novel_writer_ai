@@ -70,13 +70,12 @@
         :loading="sceneStore.isLoadingDetails || sceneStore.isGenerating"
         :read-only="false"
         @update:content="handleContentChange"
+        @save-content="saveContentChanges"
         class="content-display-card"
        />
        <!-- 如果内容编辑后需要手动保存 -->
        <div v-if="contentHasChanged" class="save-content-bar">
           <el-text type="warning" size="small">内容已修改，记得保存元数据以保存内容。</el-text>
-           <!-- 或者添加一个专门的保存内容按钮 -->
-           <!-- <el-button type="success" @click="saveContentChanges" :loading="isSavingContent">保存内容修改</el-button> -->
        </div>
 
     </div>
@@ -107,7 +106,7 @@ const projectStore = useProjectStore(); // 获取当前项目，可能用于导�
 // --- State ---
 const localSceneContent = ref(''); // 本地存储编辑器内容
 const contentHasChanged = ref(false); // 标记内容是否被用户编辑过
-// const isSavingContent = ref(false); // 如果有单独的内容保存逻辑
+const isSavingContent = ref(false); // 如果有单独的内容保存逻辑
 
 // --- Computed ---
 const isLoadingOverall = computed(() => sceneStore.isLoadingDetails); // 主加载状态
@@ -151,16 +150,15 @@ const goBack = () => {
 
 const triggerRAGGeneration = async () => {
     if (!sceneId.value) return;
-    // 可选：确认操作
-    // try {
-    //     await ElMessageBox.confirm(
-    //         '这将使用 AI 生成新的场景内容，可能会覆盖现有内容。是否继续？',
-    //         '确认生成',
-    //         { confirmButtonText: '生成', cancelButtonText: '取消', type: 'warning' }
-    //     );
-    // } catch {
-    //     return; // 用户取消
-    // }
+    try {
+        await ElMessageBox.confirm(
+            '这将使用 AI 生成新的场景内容，可能会覆盖现有内容。是否继续？',
+            '确认生成',
+            { confirmButtonText: '生成', cancelButtonText: '取消', type: 'warning' }
+        );
+    } catch {
+        return; // 用户取消
+    }
 
     try {
         await sceneStore.generateSceneContent(sceneId.value);
@@ -201,7 +199,7 @@ const handleMetadataUpdated = () => {
   // 元数据保存成功后，如果内容也被修改过，可以选择在这里一并“认为”内容也被保存了
   // 或者提示用户 RAG 生成的内容需要重新生成（如果元数据变化影响内容的话）
   if (contentHasChanged.value) {
-      // ElMessage.info('场景元数据已保存。如果修改了影响生成内容的关键信息（如目标），建议重新生成内容。');
+      ElMessage.info('场景元数据已保存。如果修改了影响生成内容的关键信息（如目标），建议重新生成内容。');
       // 如果你的后端 updateScene API 同时接受 generated_content，可以在 SceneMetadataForm 的 submit 中处理
       // 这里假设内容需要通过 RAG 生成，或者元数据保存不直接关联内容保存
   }
@@ -211,13 +209,13 @@ const handleMetadataUpdated = () => {
 const handleContentChange = (newContent) => {
     // 这个函数理论上由 computed sceneContent 的 setter 处理了
     // 但如果 SceneContentDisplay 使用不同的事件机制，可以在这里更新 localSceneContent 和 contentHasChanged
-    // localSceneContent.value = newContent;
-    // contentHasChanged.value = true;
-    // console.log("Content changed in editor:", newContent);
+    localSceneContent.value = newContent;
+    contentHasChanged.value = true;
+    console.log("Content changed in editor:", newContent);
 };
 
 // 如果需要单独保存内容修改（不推荐，最好随元数据一起保存）
-/*
+
 const saveContentChanges = async () => {
     if (!sceneId.value || !contentHasChanged.value) return;
     isSavingContent.value = true;
@@ -234,7 +232,7 @@ const saveContentChanges = async () => {
         isSavingContent.value = false;
     }
 };
-*/
+
 
 // --- Lifecycle Hooks ---
 onMounted(() => {
@@ -249,10 +247,10 @@ watch(sceneId, (newId, oldId) => {
 });
 
 // 当组件卸载时，清理活动场景状态（可选，取决于你的全局状态管理策略）
-// import { onUnmounted } from 'vue';
-// onUnmounted(() => {
-//   sceneStore.clearActiveScene();
-// });
+import { onUnmounted } from 'vue';
+onUnmounted(() => {
+  sceneStore.clearActiveScene();
+});
 
 // --- Provide/Inject (可选) ---
 // 如果子组件需要频繁访问 sceneId，可以 provide 它

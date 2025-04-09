@@ -122,7 +122,8 @@ const setupEditor = () => {
       // emit('update:modelValue', editor.value.getJSON());
 
       // Emit HTML for simplicity with v-model expecting string
-      emit('update:modelValue', editor.value.getHTML());
+      // emit('update:modelValue', editor.value.getHTML());
+      emit('update:modelValue', editor.value.getText());
     },
     onFocus: ({event}) => {
       emit('focus', event);

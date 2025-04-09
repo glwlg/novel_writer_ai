@@ -2,7 +2,6 @@
 
 from typing import Optional, Sequence, List
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Scene, Project, Chapter  # Assuming models are correctly imported
@@ -94,8 +93,10 @@ async def update_scene_generated(db: Session, scene_id: int, scene_update: Scene
     update_data = scene_update.model_dump(exclude_unset=True)
 
     for key, value in update_data.items():
-        current_value = getattr(db_scene, key)
-        if current_value != value:
+        if value is not None:
+            if not hasattr(db_scene, key):
+                print(f"警告: 模型 Scene 没有属性 {key}, 跳过更新。")
+                continue
             setattr(db_scene, key, value)
 
     db.add(db_scene)
@@ -123,8 +124,10 @@ async def update_scene_metadata(db: Session, scene_id: int, scene_update: SceneU
                 f"Target Chapter {update_data['chapter_id']} does not belong to the scene's Project {db_scene.project_id}")
 
     for key, value in update_data.items():
-        current_value = getattr(db_scene, key)
-        if current_value != value:
+        if value is not None:
+            if not hasattr(db_scene, key):
+                print(f"警告: 模型 Scene 没有属性 {key}, 跳过更新。")
+                continue
             setattr(db_scene, key, value)
             if key == 'goal':
                 needs_embedding_update = True

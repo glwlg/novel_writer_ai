@@ -21,7 +21,8 @@ async def retrieve_relevant_context(
         project_id: int,
         query_embedding: List[float],
         k_per_type: int,  # 每个类别检索多少条
-        current_scene_id: Optional[int] = None  # 用于排除正在生成的场景自身
+        current_chapter_id: Optional[int] = None,
+        current_scene_id: Optional[int] = None,  # 用于排除正在生成的场景自身
 ) -> Dict[str, List[Any]]:
     """
     从数据库检索与查询向量相关的上下文信息。
@@ -31,6 +32,7 @@ async def retrieve_relevant_context(
         query_embedding: 查询文本（如场景目标）的向量。
         k_per_type: 每个信息类别（角色、设定、场景等）最多检索的条数。
         db: SQLAlchemy 数据库会话。
+        current_chapter_id: (可选) 当前正在处理的章节 ID。
         current_scene_id: (可选) 当前正在处理的场景 ID，用于从检索中排除。
 
     Returns:
@@ -42,6 +44,7 @@ async def retrieve_relevant_context(
         "settings": [],
         "past_scenes": [],
         "character_relationships": [],
+        "last_chapter": [],
         "chapters": [],
     }
     print(f"Starting context retrieval for project {project_id} with k={k_per_type}")
@@ -106,17 +109,28 @@ async def retrieve_relevant_context(
     except Exception as e:
         print(f"Error retrieving character relationships: {e}")
 
-    # 5. (可选) 检索相关章节概要 (提供宏观上下文)
-    try:
-        relevant_chapters = db.query(Chapter) \
-            .filter(Chapter.project_id == project_id, Chapter.embedding != None) \
-            .order_by(Chapter.embedding.cosine_distance(query_embedding)) \
-            .limit(k_per_type // 2 or 1) \
-            .all()
-        retrieved_context["chapters"] = relevant_chapters
-        print(f"Retrieved {len(relevant_chapters)} relevant chapters.")
-    except Exception as e:
-        print(f"Error retrieving chapters: {e}")
+    if current_chapter_id is not None:
+        # 5. 检索上一章节
+        try:
+            last_chapter = db.query(Chapter) \
+                .filter(Chapter.project_id == project_id, Chapter.id < current_chapter_id) \
+                .order_by(Chapter.order.desc()) \
+                .first()
+            retrieved_context["last_chapter"] = [last_chapter]
+        except Exception as e:
+            print(f"Error last_chapter: {e}")
+
+    # 6. (可选) 检索相关章节概要 (提供宏观上下文)
+    # try:
+    #     relevant_chapters = db.query(Chapter) \
+    #         .filter(Chapter.project_id == project_id, Chapter.embedding != None) \
+    #         .order_by(Chapter.embedding.cosine_distance(query_embedding)) \
+    #         .limit(k_per_type // 2 or 1) \
+    #         .all()
+    #     retrieved_context["chapters"] = relevant_chapters
+    #     print(f"Retrieved {len(relevant_chapters)} relevant chapters.")
+    # except Exception as e:
+    #     print(f"Error retrieving chapters: {e}")
 
     print("Context retrieval finished.")
     return retrieved_context
@@ -126,7 +140,7 @@ async def retrieve_relevant_context(
 
 def format_context_for_prompt(
         retrieved_data: Dict[str, List[Any]],
-        max_context_length: int = 2000  # 限制总上下文长度，防止超出 Token 限制
+        max_context_length: int = 20000  # 限制总上下文长度，防止超出 Token 限制
 ) -> str:
     """
     将检索到的数据格式化为适合放入 LLM Prompt 的文本字符串。
@@ -144,13 +158,13 @@ def format_context_for_prompt(
     # 定义各部分处理函数，方便管理和截断
     def format_characters(chars: List[Character]) -> str:
         nonlocal current_length
-        part = "\n[Relevant Characters]:\n"
+        part = "\n[相关角色]:\n"
         added_len = len(part)
         if current_length + added_len > max_context_length: return ""
         current_length += added_len
 
         for char in chars:
-            entry = f"- Name: {char.name}\n"
+            entry = f"- 姓名: {char.name}\n"
             if char.description: entry += f"  Description: {char.description[:200].strip()}...\n"
             if char.current_status: entry += f"  Current Status: {char.current_status.strip()}\n"
             if char.goals: entry += f"  Goals: {char.goals[:150].strip()}...\n"
@@ -166,13 +180,13 @@ def format_context_for_prompt(
 
     def format_settings(settings: List[SettingElement]) -> str:
         nonlocal current_length
-        part = "\n[Relevant Settings/Lore]:\n"
+        part = "\n[相关设定/概念]:\n"
         added_len = len(part)
         if current_length + added_len > max_context_length: return ""
         current_length += added_len
 
         for setting in settings:
-            entry = f"- Name: {setting.name} ({setting.element_type})\n"
+            entry = f"- 名称: {setting.name} ({setting.element_type})\n"
             if setting.description: entry += f"  Description: {setting.description[:250].strip()}...\n"
 
             if current_length + len(entry) <= max_context_length:
@@ -186,7 +200,7 @@ def format_context_for_prompt(
 
     def format_past_scenes(scenes: List[Scene]) -> str:
         nonlocal current_length
-        part = "\n[Relevant Past Scene Summaries (Most Recent First)]:\n"
+        part = "\n[相关场景概要（相关度优先）]:\n"
         added_len = len(part)
         if current_length + added_len > max_context_length: return ""
         current_length += added_len
@@ -199,12 +213,12 @@ def format_context_for_prompt(
         )
 
         for scene in sorted_scenes:
-            chapter_info = f"Chapter {scene.chapter.order}" if scene.chapter else "Unassigned Chapter"
-            entry = f"- Scene ({chapter_info}, Order {scene.order_in_chapter}): {scene.title or 'Untitled Scene'}\n"
+            chapter_info = f"第 {scene.chapter.order + 1} 章" if scene.chapter else "未知章节"
+            entry = f"- 场景 ({chapter_info}, 第 {scene.order_in_chapter + 1} 个场景): {scene.title or '未命名场景'}\n"
             if scene.summary:
-                entry += f"  Summary: {scene.summary[:300].strip()}...\n"  # 使用概要比全文更节省空间
+                entry += f"  概要: {scene.summary[:1000].strip()}...\n"
             elif scene.goal:
-                entry += f"  Goal: {scene.goal[:200].strip()}...\n"  # Fallback to goal if no summary
+                entry += f"  目标: {scene.goal[:500].strip()}...\n"
 
             if current_length + len(entry) <= max_context_length:
                 part += entry
@@ -217,17 +231,17 @@ def format_context_for_prompt(
 
     def format_relationships(relationships: List[CharacterRelationship]) -> str:
         nonlocal current_length
-        part = "\n[Relevant Character Relationships]:\n"
+        part = "\n[相关角色关系]:\n"
         added_len = len(part)
         if current_length + added_len > max_context_length: return ""
         current_length += added_len
 
         for rel in relationships:
             # 确保 character1 和 character2 已加载
-            char1_name = rel.character1.name if rel.character1 else "Unknown"
-            char2_name = rel.character2.name if rel.character2 else "Unknown"
-            entry = f"- Relationship between {char1_name} and {char2_name}:\n"
-            entry += f"  Type: {rel.relationship_type}\n"
+            char1_name = rel.character1.name if rel.character1 else "未知"
+            char2_name = rel.character2.name if rel.character2 else "未知"
+            entry = f"- {char1_name} 与 {char2_name} 之间的关系:\n"
+            entry += f"  关系类型: {rel.relationship_type}\n"
             if rel.description: entry += f"  Details: {rel.description[:200].strip()}...\n"
 
             if current_length + len(entry) <= max_context_length:
@@ -239,22 +253,45 @@ def format_context_for_prompt(
                 break
         return part
 
+    def format_last_chapter(chapters: List[Chapter]) -> str:
+        nonlocal current_length
+        if len(chapters) < 1:
+            return ""
+        chapter = chapters[0]
+        if not chapter:
+            return ""
+        part = "\n[上个章节概要]:\n"
+        added_len = len(part)
+        if current_length + added_len > max_context_length: return ""
+        current_length += added_len
+
+        entry = f"- 第 {chapter.order + 1} 章: {chapter.title}\n"
+        if chapter.summary: entry += f"  概要: {chapter.summary[:1000].strip()}...\n"
+
+        if current_length + len(entry) <= max_context_length:
+            part += entry
+            current_length += len(entry)
+        else:
+            part += "- (更多章节受限长度被截断)\n"
+            current_length = max_context_length
+        return part
+
     def format_chapters(chapters: List[Chapter]) -> str:
         nonlocal current_length
-        part = "\n[Relevant Chapter Summaries]:\n"
+        part = "\n[相关章节概要]:\n"
         added_len = len(part)
         if current_length + added_len > max_context_length: return ""
         current_length += added_len
 
         for chapter in chapters:
-            entry = f"- Chapter {chapter.order}: {chapter.title}\n"
-            if chapter.summary: entry += f"  Summary: {chapter.summary[:300].strip()}...\n"
+            entry = f"- 第 {chapter.order + 1} 章: {chapter.title}\n"
+            if chapter.summary: entry += f"  概要: {chapter.summary[:1000].strip()}...\n"
 
             if current_length + len(entry) <= max_context_length:
                 part += entry
                 current_length += len(entry)
             else:
-                part += "- (More chapters truncated due to length limit)\n"
+                part += "- (更多章节受限长度被截断)\n"
                 current_length = max_context_length
                 break
         return part
@@ -276,6 +313,9 @@ def format_context_for_prompt(
         context_parts.append(format_past_scenes(retrieved_data["past_scenes"]))
         if current_length >= max_context_length: return "".join(context_parts)
 
+    if retrieved_data.get("last_chapter"):
+        context_parts.append(format_last_chapter(retrieved_data["last_chapter"]))
+
     if retrieved_data.get("chapters"):
         context_parts.append(format_chapters(retrieved_data["chapters"]))
         # No need to check length after the last part
@@ -286,7 +326,7 @@ def format_context_for_prompt(
         return "[No relevant context found or context exceeds length limit]"
 
     # 添加总的包围结构
-    return f"--- Relevant Context ---\n{final_context.strip()}\n--- End of Context ---"
+    return f"<相关上下文>\n{final_context.strip()}\n</相关上下文>"
 
 
 # --- Core RAG Service Function ---
@@ -303,6 +343,32 @@ async def generate_scene_content_rag(
     5. Calls LLM to generate content.
     6. Updates scene with generated content, status, and optional summary/embedding.
     """
+    system_prompt = """
+你是一名AI小说写作助手。你的任务是根据下面给出的“场景目标”和“相关背景”，撰写相应的场景内容。
+请注意：
+创作时必须完全基于所提供的“场景目标”和“相关背景”。
+写作的中心是实现“场景目标”。
+请运用“相关背景”来设计人物的行为、对话、场景细节以及他们之间的关系。（重要：如果这是章节中的后续场景，请确保“相关背景”包含了前一场景结尾时的关键信息，如人物情绪、位置、遗留问题等。）
+保持连贯性： 确保本场景的开端与“相关背景”中提供的前续场景信息（人物状态、情节进展、环境等）自然衔接，避免逻辑冲突或状态突变。
+除非“目标”或“背景”中已有暗示，否则不要自行添加新的主要角色或重要故事情节。
+请用清晰、有吸引力的叙事风格来写。
+最后，只需输出场景本身的内容，不要附加任何说明或标签。
+            """
+    summarize_system_prompt = """
+角色： AI内容摘要助手。
+任务： 请仔细阅读下方提供的完整小说场景文本，并为其生成一份简洁的摘要。
+摘要应涵盖：
+场景发生的主要事件和流程概要。
+核心的冲突或解决的问题。
+角色之间最重要的互动或关系变化。
+场景传递的关键信息或达成的主要目的。
+要求：
+摘要必须忠实于原文内容。
+语言精练、清晰、高度概括。
+旨在让人快速了解该场景的核心内容和作用。
+输出： 仅提供该场景的摘要文字，通常是一小段话或几个关键句子。
+            """
+
     # 1. Fetch the Scene
     scene = scene_service.get_scene(db, scene_id=scene_id)
 
@@ -325,31 +391,38 @@ async def generate_scene_content_rag(
 
         # 3. Retrieve Relevant Context
         print("Retrieving relevant context...")
-        retrieved_context = await retrieve_relevant_context(db, scene.project_id, query_embedding, 10,current_scene_id=scene_id)
+        # 如果是章节中的第一个场景，需要查询上一章节
+        current_chapter_id = None
+        if scene.order_in_chapter == 0:
+            current_chapter_id = scene.chapter_id
+        retrieved_context = await retrieve_relevant_context(db, scene.project_id, query_embedding, 10,
+                                                            current_chapter_id=current_chapter_id,
+                                                            current_scene_id=scene_id)
         # print(f"Retrieved Context: {retrieved_context}") # DEBUG
 
         # 4. Format Context
-        context_string = format_context_for_prompt(retrieved_context)
+        context_string = format_context_for_prompt(retrieved_context, max_context_length=20000)
         print("Formatted Context String (truncated):")
         print(context_string[:500] + "..." if len(context_string) > 500 else context_string)
 
+        chapter_info = f"第 {scene.chapter.order + 1} 章" if scene.chapter else "未知章节"
+        current_scene = f"- 场景 ({chapter_info}, 第 {scene.order_in_chapter + 1} 个场景): {scene.title or '未命名场景'}\n"
+
         # 5. Build Prompt
         # Prompt Engineering is key here! This is a basic example.
-        prompt = f"""You are an AI assistant helping write a novel scene.
-Generate the prose content for a scene based *only* on the provided Scene Goal and Relevant Context.
-Focus on fulfilling the Scene Goal. Use the context to inform character actions, dialogue, setting details, and relationships.
-Do not invent major characters or plot points not mentioned in the goal or context unless implied.
-Write in a clear, engaging narrative style. Output only the scene content itself.
+        prompt = f"""
+<小说概要>
+{scene.project.title}
 
---- Relevant Context ---
+{scene.project.logline}
+</小说概要>
+<相关背景>
 {context_string}
---- End of Context ---
-
---- Scene Goal ---
+</相关背景>
+<场景目标>
+请完成 {current_scene}
 {scene.goal}
---- End of Goal ---
-
-Scene Content:
+</场景目标>
 """
         print("\n--- Generated Prompt (truncated) ---")  # DEBUG
         print(prompt[:1000] + "..." if len(prompt) > 1000 else prompt)  # DEBUG
@@ -357,7 +430,11 @@ Scene Content:
 
         # 6. Call LLM to Generate Content
         print("Calling LLM for scene content generation...")
-        generated_text = await llm_service.generate_text(prompt, max_tokens=3000)  # Adjust max_tokens as needed
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        generated_text = await llm_service.generate_text(messages, max_tokens=48000)
         print("LLM generation complete.")
         print("\n--- Generated Content (truncated) ---")  # DEBUG
         print(generated_text[:500] + "..." if len(generated_text) > 500 else generated_text)  # DEBUG
@@ -369,7 +446,11 @@ Scene Content:
         # 8. (Optional but Recommended) Generate Summary and Embedding for the generated content
         print("Generating summary for the new content...")
         try:
-            summary = await llm_service.summarize_text(generated_text, max_tokens=300)
+            messages = [
+                {"role": "system", "content": summarize_system_prompt},
+                {"role": "user", "content": generated_text}
+            ]
+            summary = await llm_service.generate_text(messages, max_tokens=28000)
             scene_update.summary = summary
             print(f"Generated Summary: {summary[:200]}...")
             if summary:

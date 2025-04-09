@@ -5,14 +5,15 @@ from typing import List, Optional
 from openai import OpenAI
 from app.core.config import settings
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_API_BASE)
+client = OpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_API_BASE)
+embed_client = OpenAI(api_key=settings.EMBED_API_KEY, base_url=settings.EMBED_API_BASE)
 
 
 # 文本流生成
 async def generate_text_stream(messages, max_tokens: int = 150) -> str:
     messages_data = [{'role': message['role'], 'content': message['content']} for message in messages]
     try:
-        response = client.chat.completions.create(model=settings.OPENAI_MODEL,
+        response = client.chat.completions.create(model=settings.LLM_MODEL,
                                                   messages=messages_data,
                                                   max_tokens=max_tokens,
                                                   stream=True,
@@ -38,30 +39,17 @@ async def generate_text_stream(messages, max_tokens: int = 150) -> str:
     except Exception as e:
         print(f"Error calling OpenAI API: {e}")
         # 更健壮的错误处理
-        return f"Error generating text: {e}"
+        raise Exception("Failed to generate text")
 
 
-async def generate_text(prompt: str, max_tokens: int = 150) -> str:
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant writing a novel."},
-        {"role": "user", "content": prompt}
-    ]
-    return await generate_text_stream(messages, max_tokens=max_tokens)
-
-
-async def summarize_text(prompt: str, max_tokens: int = 150) -> str:
-    messages = [
-        {"role": "system",
-         "content": "You are a helpful assistant writing a novel.please summarize the following text"},
-        {"role": "user", "content": prompt}
-    ]
+async def generate_text(messages, max_tokens: int = 150) -> str:
     return await generate_text_stream(messages, max_tokens=max_tokens)
 
 
 # 未来可以添加获取 embedding 的函数等
 async def get_embedding(text: str) -> List[float]:
-    response = client.embeddings.create(
-        model="text-embedding-v3",  # 或其他嵌入模型
+    response = embed_client.embeddings.create(
+        model=settings.EMBED_MODEL,
         input=text,
         dimensions=1024,
         encoding_format="float"

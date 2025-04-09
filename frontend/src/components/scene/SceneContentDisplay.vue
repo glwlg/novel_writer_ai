@@ -3,9 +3,9 @@
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
-          <span>生成内容</span>
+          <span>场景内容</span>
           <!-- 可选：添加编辑/保存按钮，如果编辑器在此组件内管理保存 -->
-          <!-- <el-button v-if="!readOnly" type="primary" size="small" @click="saveContent" :loading="isSavingContent">保存内容</el-button> -->
+           <el-button v-if="!readOnly" type="primary" size="small" @click="saveContent" :loading="isSavingContent">保存内容</el-button>
         </div>
       </template>
 
@@ -19,7 +19,6 @@
           <el-text type="info">无生成内容。</el-text>
       </div>
       <div v-else>
-        <!-- 方案一：使用预定义的 RichTextEditor 组件 -->
          <RichTextEditor
            v-if="!readOnly"
            v-model="editableContent"
@@ -29,11 +28,7 @@
              },
            }"
          />
-         <!-- 只读状态：直接渲染 HTML 或使用特定查看器 -->
           <div v-else class="read-only-content prose" v-html="processedContent"></div>
-
-        <!-- 方案二：如果只需要简单显示文本 -->
-        <!-- <pre v-else class="read-only-content-pre">{{ content }}</pre> -->
       </div>
 
     </el-card>
@@ -42,7 +37,8 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
-import RichTextEditor from '@/components/common/RichTextEditor.vue'; // 确保路径正确
+import RichTextEditor from '@/components/common/RichTextEditor.vue';
+import {ElMessage} from "element-plus"; // 确保路径正确
 // import DOMPurify from 'dompurify'; // 如果需要清理 v-html 的内容
 
 // --- Props ---
@@ -67,7 +63,7 @@ const emit = defineEmits(['update:content']);
 
 // --- Refs ---
 const editableContent = ref('');
-// const isSavingContent = ref(false); // 如果在此组件处理保存
+const isSavingContent = ref(false); // 如果在此组件处理保存
 
 // --- Watcher ---
 // 当外部 content 变化时，更新内部的 editableContent (用于编辑器)
@@ -95,12 +91,10 @@ const processedContent = computed(() => {
 
 // --- Methods ---
 // 如果需要在此组件内保存内容
-/*
 const saveContent = async () => {
   isSavingContent.value = true;
   try {
     // 调用 API 或 emit 事件给父组件处理保存
-    // await sceneAPI.updateScene(props.sceneId, { generated_content: editableContent.value });
     emit('save-content', editableContent.value); // 示例：发出保存事件
     ElMessage.success('内容已保存');
   } catch (error) {
@@ -110,7 +104,6 @@ const saveContent = async () => {
     isSavingContent.value = false;
   }
 };
-*/
 
 </script>
 

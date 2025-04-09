@@ -108,7 +108,7 @@ export const useSceneStore = defineStore('scene', {
             // Decide which loading state makes sense, maybe details?
             this._setLoading('details', true);
             this._setError('details', null);
-            const previousChapterId = this.activeScene?.chapter_id; // Store old chapter id
+            const previousChapterId = sceneUpdateData.previousChapterId ? sceneUpdateData.previousChapterId : this.activeScene?.chapter_id;
             try {
                 const response = await sceneAPI.updateScene(sceneId, sceneUpdateData);
                 const updatedScene = response.data;
@@ -129,7 +129,7 @@ export const useSceneStore = defineStore('scene', {
                 } else if (!previousChapterId && currentChapterId) { // Moved from unassigned to chapter
                     this.unassignedScenes = this.unassignedScenes.filter(s => s.id !== sceneId);
                     chapterStore.addSceneToChapter(currentChapterId, updatedScene);
-                } else if (previousChapterId && currentChapterId && previousChapterId !== currentChapterId) { // Moved between chapters
+                } else if (previousChapterId && currentChapterId && previousChapterId !== currentChapterId) {
                     chapterStore.removeSceneFromChapter(previousChapterId, sceneId);
                     chapterStore.addSceneToChapter(currentChapterId, updatedScene);
                 } else if (currentChapterId) { // Updated within the same chapter

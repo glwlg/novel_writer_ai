@@ -37,7 +37,7 @@ class SceneUpdate(BaseModel):
     goal: Optional[str] = None
     summary: Optional[str] = None
     # summary_embedding: Optional[List[float]] = None
-    # generated_content: Optional[str] = None
+    generated_content: Optional[str] = None
     order_in_chapter: Optional[int] = None
     status: Optional[SceneStatus] = None
     chapter_id: Optional[int] = None # 允许移动章节
