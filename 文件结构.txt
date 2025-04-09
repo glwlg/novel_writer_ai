@@ -1,0 +1,160 @@
+novel_writer_ai/
+├── backend/                     # 后端 FastAPI 应用
+│   ├── .venv/                   # Python 虚拟环境 (通常加入 .gitignore)
+│   ├── alembic/                 # Alembic 数据库迁移文件
+│   │   ├── versions/            # 自动生成的迁移脚本 (e.g., xxxxx_initial_schema.py)
+│   │   │   └── ...
+│   │   ├── env.py               # Alembic 运行环境配置 (配置模型元数据)
+│   │   └── script.py.mako       # 迁移脚本模板
+│   ├── app/                     # FastAPI 应用核心代码
+│   │   ├── core/                # 应用核心配置、通用工具
+│   │   │   ├── __init__.py
+│   │   │   └── config.py        # Pydantic Settings (读取 .env)
+│   │   ├── db/                  # 数据库连接与会话管理
+│   │   │   ├── __init__.py
+│   │   │   └── session.py       # SQLAlchemy engine, SessionLocal, get_db 依赖
+│   │   ├── models/              # SQLAlchemy ORM 模型 (数据库表定义)
+│   │   │   ├── __init__.py      # 导入所有模型并定义 Base
+│   │   │   ├── base.py          # SQLAlchemy Base 定义
+│   │   │   ├── project.py       # Project 模型 (项目信息)
+│   │   │   ├── character.py     # Character 模型 (角色信息) CharacterRelationship 模型 (角色关系)
+│   │   │   ├── setting.py       # SettingElement 模型 (设定元素)
+│   │   │   ├── structure.py     # Chapter, Scene, SceneStatus Enum
+│   │   │   └── associations.py  # Many-to-many link tables scene_character_association, scene_setting_association
+│   │   ├── schemas/             # Pydantic Schema (API 数据校验与格式化)
+│   │   │   ├── __init__.py
+│   │   │   ├── project.py       # ProjectCreate, ProjectRead, ProjectUpdate
+│   │   │   ├── character.py     # CharacterCreate, CharacterRead, CharacterUpdate, CharacterReadMinimal
+│   │   │   ├── setting.py       # SettingElementCreate, SettingElementRead, SettingElementUpdate, SettingElementReadMinimal
+│   │   │   ├── chapter.py       # ChapterCreate, ChapterRead, ChapterUpdate, ChapterReadMinimal
+│   │   │   ├── scene.py         # SceneCreate, SceneRead, SceneUpdate, SceneReadMinimal
+│   │   │   └── common.py        # (可选) 分页、ID 等通用 Schema
+│   │   ├── services/            # 业务逻辑层 (包含 CRUD 实现)
+│   │   │   ├── __init__.py
+│   │   │   ├── project_service.py      # Project 模型的 CRUD 和业务逻辑
+│   │   │   ├── character_service.py    # Character 模型的 CRUD, Embedding 生成逻辑
+│   │   │   ├── relationship_service.py #  CharacterRelationship 模型的 CRUD
+│   │   │   ├── setting_service.py      # SettingElement 模型的 CRUD, Embedding 生成逻辑
+│   │   │   ├── chapter_service.py      # Chapter 模型的 CRUD, (可选)概要 Embedding 逻辑
+│   │   │   ├── scene_service.py        # Scene 模型的 CRUD, goal_embedding 生成逻辑
+│   │   │   ├── llm_service.py          # 基础 LLM API 调用 (文本生成, Embedding 获取, 摘要)
+│   │   │   └── rag_service.py          # RAG 核心 (检索上下文, 格式化, 整合生成)
+│   │   ├── routers/             # API 路由定义 (调用 Services)
+│   │   │   ├── __init__.py      # 可以在这里导入所有 router 方便 main.py 注册
+│   │   │   ├── projects.py      # API routes for /projects/*
+│   │   │   ├── characters.py    # API routes for /characters/* or nested
+│   │   │   ├── settings.py      # API routes for /settings/*
+│   │   │   ├── chapters.py      # API routes for /chapters/*
+│   │   │   ├── scenes.py        # API routes for /scenes/*
+│   │   │   ├── relationships.py # API routes for /relationships/*
+│   │   │   └── generation.py    # API routes for AI generation (e.g., /scenes/{id}/generate_rag)
+│   │   ├── __init__.py
+│   │   └── main.py              # FastAPI 应用入口 (创建 app, 添加中间件, 包含 Routers)
+│   ├── .env                     # 环境变量 (数据库URL, API Keys - *加入 .gitignore*)
+│   ├── alembic.ini              # Alembic 配置文件 (配置数据库 URL)
+│   └── requirements.txt         # Python 依赖列表
+│
+├── frontend/                    # 前端 Vue.js 应用
+│   ├──src/
+│   │   ├── router/
+│   │   │   └── index.js        # Vue Router 路由配置
+│   │   ├── views/              # 页面级视图组件 (对应路由)
+│   │   │   ├── ProjectDashboard.vue  # 项目仪表盘 (列表/创建入口) - 对应 GET /, POST /projects
+│   │   │   ├── ProjectWorkspace.vue  # 项目主工作区 (布局组件，包含侧边栏/顶部导航和内容区域 <router-view>)
+│   │   │   │   │                     # 自身对应 /projects/:projectId (GET /projects/:project_id)
+│   │   │   │   │
+│   │   │   │   ├── WorldBuilding/     # 世界观设定父级路由 (可选，或直接挂载子路由)
+│   │   │   │   │   ├── CharactersList.vue # 角色管理 - 对应 GET /projects/:projectId/characters/, POST /projects/:projectId/characters/
+│   │   │   │   │   │                     #  (列表项包含跳转详情/编辑/删除按钮)
+│   │   │   │   │   │                     # (模态框 Modal 实现编辑/创建 对应 GET /characters/:characterId, PATCH /characters/:characterId, DELETE /characters/:characterId)
+│   │   │   │   │   ├── SettingsList.vue   # 设定元素管理 - 对应 GET /projects/:projectId/settings/, POST /projects/:projectId/settings/
+│   │   │   │   │   │                      # (模态框 Modal 实现编辑/创建 - 对应 GET /settings/:settingId, PATCH /settings/:settingId, DELETE /settings/:settingId
+│   │   │   │   │   └── RelationshipsList.vue # 人物关系管理 - 对应 GET /projects/:projectId/relationships/, POST /projects/:projectId/relationships/
+│   │   │   │   │                         #             (可能需要按角色筛选，列表项包含编辑/删除)
+│   │   │   │   │                         # (更新/删除 对应 PATCH/DELETE /relationships/:relationshipId)
+│   │   │   │   │
+│   │   │   │   ├── StoryStructure/     # 故事结构父级路由
+│   │   │   │   │   └── StructureEditor.vue # 大纲/结构编辑器 (核心页面)
+│   │   │   │   │       │                   # - 显示章节列表 (GET /projects/:projectId/chapters)
+│   │   │   │   │       │                   # - 支持章节 CRUD (POST /projects/:projectId/chapters, PATCH /chapters/:chapterId, DELETE /chapters/:chapterId)
+│   │   │   │   │       │                   # - 支持章节拖拽排序 (对应 PATCH /chapters/:chapterId 更新 order)
+│   │   │   │   │       │                   # - 显示章节下的场景列表 (GET /chapters/:chapterId/scenes)
+│   │   │   │   │       │                   # - 显示未分配章节的场景列表 (GET /projects/:projectId/scenes/unassigned)
+│   │   │   │   │       │                   # - 支持场景拖拽排序 (对应 PATCH /scenes/:sceneId 更新 order_in_chapter)
+│   │   │   │   │       │                   # - 支持创建新场景 (POST /scenes)
+│   │   │   │   │       │                   # - 场景项链接到场景详情/编辑页
+│   │   │   │   │
+│   │   │   │   └── SceneEditor/         # 场景编辑/生成父级路由
+│   │   │   │       └── SceneDetail.vue    # 场景详情与编辑页 - 对应 /scenes/:sceneId
+│   │   │   │           │                  # - 显示场景元数据 (GET /scenes/:sceneId)
+│   │   │   │           │                  # - 编辑场景元数据 (标题, 目标goal, 状态status, 所属章节chapter_id 等) (PATCH /scenes/:sceneId)
+│   │   │   │           │                  # - 显示/编辑场景生成内容 (generated_content) (也通过 PATCH /scenes/:sceneId 更新)
+│   │   │   │           │                  # - **触发 RAG 生成按钮** (调用 POST /scenes/:sceneId/generate_rag)
+│   │   │   │           │                  # - 显示生成状态 (等待中、已完成、失败)
+│   │   │   │           │                  # - 删除场景按钮 (DELETE /scenes/:sceneId)
+│   │   │   │
+│   │   │   └── NotFound.vue        # 404 页面
+│   │   │
+│   │   ├── components/         # 可复用 UI 组件
+│   │   │   ├── common/           # 通用基础组件
+│   │   │   │   ├── AppHeader.vue
+│   │   │   │   ├── AppSidebar.vue    # (如果 ProjectWorkspace 使用侧边栏导航)
+│   │   │   │   ├── LoadingSpinner.vue
+│   │   │   │   ├── ErrorMessage.vue
+│   │   │   │   ├── ConfirmDialog.vue # 删除确认框
+│   │   │   │   └── RichTextEditor.vue # 富文本编辑器 (用于描述、目标、生成内容等)
+│   │   │   │
+│   │   │   ├── project/
+│   │   │   │   ├── ProjectCard.vue   # 用于 ProjectDashboard 显示项目
+│   │   │   │   └── ProjectForm.vue   # 创建/编辑项目的表单 (可能在 Modal 或单独页面)
+│   │   │   │
+│   │   │   ├── character/
+│   │   │   │   ├── CharacterCard.vue # 角色列表项
+│   │   │   │   └── CharacterForm.vue # 创建/编辑角色的表单
+│   │   │   │
+│   │   │   ├── setting/
+│   │   │   │   ├── SettingCard.vue   # 设定列表项
+│   │   │   │   └── SettingForm.vue   # 创建/编辑设定的表单
+│   │   │   │
+│   │   │   ├── relationship/
+│   │   │   │   ├── RelationshipDisplay.vue # 关系列表项
+│   │   │   │   └── RelationshipForm.vue    # 创建/编辑关系的表单 (需要选择两个角色)
+│   │   │   │
+│   │   │   ├── chapter/
+│   │   │   │   ├── ChapterItem.vue   # 章节列表项 (用于 StructureEditor)
+│   │   │   │   └── ChapterForm.vue   # 创建/编辑章节的表单
+│   │   │   │
+│   │   │   └── scene/
+│   │   │       ├── SceneItem.vue       # 场景列表项 (用于 StructureEditor)
+│   │   │       ├── SceneMetadataForm.vue # 编辑场景元数据的表单 (在 SceneDetail 中使用)
+│   │   │       └── SceneContentDisplay.vue # 显示/编辑生成内容的区域 (在 SceneDetail 中使用)
+│   │   │
+│   │   ├── store/              # 状态管理 (Pinia 或 Vuex)
+│   │   │   ├── index.js          # 主入口
+│   │   │   ├── project.js        # Project 相关状态和 Actions
+│   │   │   ├── character.js      # Character 相关状态和 Actions
+│   │   │   ├── setting.js        # Setting 相关状态和 Actions
+│   │   │   ├── relationship.js   # Relationship 相关状态和 Actions
+│   │   │   ├── chapter.js        # Chapter 相关状态和 Actions (可能包含嵌套场景信息)
+│   │   │   ├── scene.js          # Scene 相关状态和 Actions (特别是当前活动场景)
+│   │   │   └── ui.js             # UI 状态 (加载、错误、模态框等)
+│   │   │
+│   │   ├── services/ or api/   # API 请求封装 (使用 axios 或 fetch)
+│   │   │   ├── apiClient.js      # Axios 实例配置 (baseURL, interceptors)
+│   │   │   ├── projectAPI.js
+│   │   │   ├── characterAPI.js
+│   │   │   ├── settingAPI.js
+│   │   │   ├── relationshipAPI.js
+│   │   │   ├── chapterAPI.js
+│   │   │   ├── sceneAPI.js
+│   │   │   └── generationAPI.js  # 对应 generation router
+│   │   │
+│   │   ├── App.vue             # 根组件
+│   │   └── main.js             # 应用入口 (初始化 Vue, Router, Store)
+│   │
+│	├── vite.config.js
+│	└── package.json
+│
+├── .gitignore                   # Git 忽略规则 (包含 .env*, node_modules/, .venv/, __pycache__/ 等)
+├── docker-compose.yml           # Docker Compose (启动 PostgreSQL+PGVector 数据库服务)
+└── README.md                    # 项目总体说明 (如何设置、运行、架构概述)

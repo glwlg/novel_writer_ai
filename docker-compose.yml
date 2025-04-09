@@ -1,0 +1,41 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: novel_db_pgvector
+    environment:
+      # 从 .env 文件读取环境变量
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_HOST_PORT}:5432"
+    volumes:
+      # 使用命名卷持久化数据库数据
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      # 连接到自定义网络
+      - novelnet
+    healthcheck:
+      # 检查数据库是否准备好接受连接
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s # 每 10 秒检查一次
+      timeout: 5s   # 每次检查超时时间
+      retries: 5    # 重试 5 次失败后标记为 unhealthy
+      start_period: 10s # 启动后等待 10 秒开始检查 (给数据库启动时间)
+    restart: unless-stopped
+    # (可选) 如果需要设置时区
+    # environment:
+    #   TZ: 'Asia/Shanghai'
+
+# 定义命名卷
+volumes:
+  postgres_data:
+    driver: local # 使用本地驱动
+
+# 定义自定义网络
+networks:
+  novelnet:
+    driver: bridge # 使用桥接网络驱动

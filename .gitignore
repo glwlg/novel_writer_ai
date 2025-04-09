@@ -1,0 +1,34 @@
+# General
+.DS_Store
+*.log
+*.pot
+*.pyc
+__pycache__/
+
+# IDEs / Editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# Backend (Python)
+backend/.venv/
+backend/.env
+backend/instance/ # 如果使用 Flask 风格的实例文件夹
+backend/migrations/ # 如果使用 Alembic 等迁移工具，根据情况决定是否忽略
+
+# Frontend (Node)
+frontend/node_modules/
+frontend/dist/
+frontend/.env*
+frontend/.output
+frontend/.nuxt* # If using Nuxt
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.local
+
+# Docker
+postgres_data/ # Docker volume data, should not be committed
+
+.env
