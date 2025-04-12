@@ -417,8 +417,6 @@ async def generate_scenes(
         print("Formatted Context String (truncated):")
         print(context_string[:500] + "..." if len(context_string) > 500 else context_string)
 
-        chapter_info = f"第 {chapter.order + 1} 章: {chapter.title}"
-
         # 5. Build Prompt
         # Prompt Engineering is key here! This is a basic example.
         prompt = f"""
@@ -459,6 +457,7 @@ async def generate_scenes(
             print(json_string_to_parse)
             print("---------------------------\n")
             scene_list = json.loads(json_string_to_parse)
+            scene_service.delete_scenes_by_chapter(db, chapter_id)
             for i, scene in enumerate(scene_list):
                 print(f"--- 场景 {i + 1} ---")
                 print(f"标题: {scene.get('title')}")

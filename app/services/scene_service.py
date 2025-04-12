@@ -72,8 +72,7 @@ def get_scenes_by_chapter(db: Session, chapter_id: int, skip: int = 0, limit: in
         Scene.chapter_id == chapter_id).order_by(Scene.order_in_chapter).all()
 
 
-def get_scenes_by_project(db: Session, project_id: int, skip: int = 0, limit: int = 100) -> Sequence[
-    Scene]:
+def get_scenes_by_project(db: Session, project_id: int, skip: int = 0, limit: int = 100) -> List[Scene]:
     """Gets scenes belonging to a project ."""
     # Check if project exists
     project = db.get(Project, project_id)
@@ -84,7 +83,8 @@ def get_scenes_by_project(db: Session, project_id: int, skip: int = 0, limit: in
         Scene.project_id == project_id).order_by(
         Scene.created_at).offset(skip).limit(limit).all()
 
-def get_scenes_by_project_unassigned(db: Session, project_id: int, skip: int = 0, limit: int = 100) -> Sequence[
+
+def get_scenes_by_project_unassigned(db: Session, project_id: int, skip: int = 0, limit: int = 100) -> List[
     Scene]:
     """Gets scenes belonging to a project but not assigned to any chapter."""
     # Check if project exists
@@ -160,3 +160,12 @@ def delete_scene(db: Session, scene_id: int) -> Optional[Scene]:
         db.delete(db_scene)
         db.commit()
     return db_scene
+
+
+def delete_scenes_by_chapter(db: Session, chapter_id: int) -> List[Scene]:
+    """Deletes a scene."""
+    scenes = get_scenes_by_chapter(db, chapter_id)
+    for scene in scenes:
+        db.delete(scene)
+        db.commit()
+    return scenes

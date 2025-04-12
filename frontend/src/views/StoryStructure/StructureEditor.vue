@@ -148,7 +148,7 @@ import {useChapterStore} from '@/store/chapter';
 import {useSceneStore} from '@/store/scene';
 import {useProjectStore} from '@/store/project';
 import ChapterItem from '@/components/chapter/ChapterItem.vue';
-import {ElMessage, ElMessageBox, ElPopconfirm} from 'element-plus';
+import {ElMessage, ElMessageBox, ElNotification, ElPopconfirm} from 'element-plus';
 import {Delete, Document, Edit, MagicStick, Plus} from '@element-plus/icons-vue';
 import RichTextEditor from "@/components/common/RichTextEditor.vue";
 import ChapterForm from "@/components/chapter/ChapterForm.vue";
@@ -220,9 +220,9 @@ const volumesWithChapters = computed(() => {
   });
 
   chapters.value.forEach(chap => {
-     if (volumeMap[chap.volume_id]) {
-         volumeMap[chap.volume_id].chapters.push({...chap});
-     }
+    if (volumeMap[chap.volume_id]) {
+      volumeMap[chap.volume_id].chapters.push({...chap});
+    }
   });
 
   return Object.values(volumeMap);
@@ -491,10 +491,28 @@ const triggerScenesGeneration = async (chapterId) => {
   }
 
   try {
-    await chapterStore.generateChapterScenes(chapter_id);
+    const new_chapter = await chapterStore.generateChapterScenes(chapterId);
     ElMessage.success('场景生成成功！');
-    // 成功后，确保 chapterStore.chapters 被更新，或者手动触发一次 chapter 获取
-    await chapterStore.fetchChapters(projectId.value); // 可选，如果 store action 没有更新本地 state
+    ElMessageBox.confirm(
+        `场景生成成功！是否继续生成场景内容？`,
+        '确认生成',
+        {
+          confirmButtonText: '生成',
+          cancelButtonText: '取消',
+          type: 'info',
+        }
+    ).then(async () => {
+      // 遍历新生成的场景，逐个生成内容
+      if (!new_chapter.scenes || new_chapter.scenes.length === 0) {
+        ElMessage.warning('没有生成的场景，跳过内容生成。');
+        return;
+      }
+      for (const scene of new_chapter.scenes) {
+        await sceneStore.generateSceneContent(scene.id);
+      }
+    }).catch(async () => {
+      await chapterStore.fetchChapters(projectId.value);
+    });
   } catch (err) {
     console.error('Scenes generation failed:', err);
     if (err) {

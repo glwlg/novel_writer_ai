@@ -80,6 +80,8 @@ const chapterFormRef = ref(null); // Ref for the form instance
 // 使用 reactive 确保深度监听，但要小心直接赋值覆盖响应性
 // 更好的方式是使用 ref 包裹一个对象
 const formData = ref({
+  volume_id: 0,
+  order: 0,
   title: '',
   summary: ''
   // 不在这里包含 project_id 或 id，它们由 props 或逻辑决定
@@ -107,10 +109,15 @@ watch(() => props.initialData, (newData) => {
     // 编辑模式：填充表单
     formData.value.title = newData.title || '';
     formData.value.summary = newData.summary || '';
+    formData.value.volume_id = props.initialData.volume_id;
+    formData.value.order = props.initialData.order;
+    console.log('formData', formData);
   } else {
     // 创建模式：重置表单
     formData.value.title = '';
     formData.value.summary = '';
+    formData.value.volume_id = props.initialData.volume_id;
+    formData.value.order = props.initialData.order;
     // 如果表单实例存在，清除校验状态
     chapterFormRef.value?.resetFields();
   }
@@ -123,7 +130,7 @@ const handleSubmit = async () => {
   try {
     // 触发表单验证
     await chapterFormRef.value.validate();
-
+    console.log(props.initialData);
     // 验证通过，准备数据并发送事件
     let payload;
     if (isEditing.value) {
@@ -131,17 +138,16 @@ const handleSubmit = async () => {
       payload = {
         title: formData.value.title,
         summary: formData.value.summary
-        // 注意：根据后端 API，可能还需要包含 order 等字段
-        // order: props.initialData.order // 如果需要传递 order
       };
       emit('save', {id: props.initialData.id, data: payload});
     } else {
       // 创建模式: 发送 ChapterCreate schema 需要的数据
       payload = {
-        project_id: props.projectId, // **重要：创建时需要 project_id**
+        project_id: props.projectId,
+        volume_id: formData.value.volume_id,
         title: formData.value.title,
+        order: formData.value.order,
         summary: formData.value.summary
-        // 注意：后端的 order 可能由服务层自动处理，或需要前端指定一个初始值（如 0 或列表长度）
       };
       emit('save', {data: payload}); // 不传 ID 表示创建
     }
