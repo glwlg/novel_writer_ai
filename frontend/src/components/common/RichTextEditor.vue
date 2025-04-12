@@ -5,22 +5,19 @@
       <el-tooltip effect="dark" content="撤销 (Ctrl+Z)" placement="top">
         <el-button @click="editor.chain().focus().undo().run()" text bg size="small"
                    :disabled="!editor.can().undo() || disabled" aria-label="撤销">
-          <el-icon><RefreshLeft /></el-icon>
+          <el-icon>
+            <RefreshLeft/>
+          </el-icon>
         </el-button>
       </el-tooltip>
       <el-tooltip effect="dark" content="重做 (Ctrl+Y)" placement="top">
         <el-button @click="editor.chain().focus().redo().run()" text bg size="small"
                    :disabled="!editor.can().redo() || disabled" aria-label="重做">
-          <el-icon><RefreshRight /></el-icon>
+          <el-icon>
+            <RefreshRight/>
+          </el-icon>
         </el-button>
       </el-tooltip>
-      <!-- Optional Italic button -->
-      <!--
-      <el-tooltip effect="dark" content="斜体 (Ctrl+I)" placement="top">
-         ...
-      </el-tooltip>
-      -->
-      <!-- Character Count -->
       <span class="word-count" v-if="showWordCount && editor">
         字数: {{ characterCount }}
       </span>
@@ -32,8 +29,8 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount, defineProps, defineEmits, computed } from 'vue';
-import { Editor, EditorContent } from '@tiptap/vue-3';
+import {ref, watch, onMounted, onBeforeUnmount, defineProps, defineEmits, computed} from 'vue';
+import {Editor, EditorContent} from '@tiptap/vue-3';
 // --- Core Tiptap Extensions ---
 import Document from '@tiptap/extension-document';
 import Paragraph from '@tiptap/extension-paragraph';
@@ -45,16 +42,16 @@ import CharacterCount from '@tiptap/extension-character-count'; // Word/Characte
 // import Italic from '@tiptap/extension-italic';
 
 // --- UI Components ---
-import { ElButton, ElIcon, ElTooltip } from 'element-plus';
-import { RefreshLeft, RefreshRight } from '@element-plus/icons-vue';
+import {ElButton, ElIcon, ElTooltip} from 'element-plus';
+import {RefreshLeft, RefreshRight} from '@element-plus/icons-vue';
 
 // --- Props Definition ---
 const props = defineProps({
-  modelValue: { type: String, default: '' },
-  placeholder: { type: String, default: '从这里开始你的故事...' },
-  showToolbar: { type: Boolean, default: true },
-  disabled: { type: Boolean, default: false },
-  showWordCount: { type: Boolean, default: true },
+  modelValue: {type: String, default: ''},
+  placeholder: {type: String, default: '从这里开始你的故事...'},
+  showToolbar: {type: Boolean, default: true},
+  disabled: {type: Boolean, default: false},
+  showWordCount: {type: Boolean, default: true},
   // limit: { type: Number, default: null }, // Optional limit for CharacterCount
 });
 
@@ -75,10 +72,10 @@ const plainTextToHtmlParagraphs = (text) => {
   if (textString.trim() === '') return '<p></p>';
   return textString
       .replace(/\n\n/g, '\n') // Normalize line endings
-    .split('\n')
-    // Wrap each line in <p> tags. Even empty lines become <p></p>.
-    .map(line => `<p>${line}</p>`)
-    .join('');
+      .split('\n')
+      // Wrap each line in <p> tags. Even empty lines become <p></p>.
+      .map(line => `<p>${line}</p>`)
+      .join('');
 };
 
 // --- Computed Properties ---
@@ -93,10 +90,10 @@ const setupEditor = () => {
     Document,
     Paragraph, // Essential for paragraphs
     Text,      // Essential for text nodes
-    History.configure({ depth: 50 }), // Configure undo history size
+    History.configure({depth: 50}), // Configure undo history size
     Placeholder.configure({
-       placeholder: props.placeholder,
-       emptyEditorClass: 'is-editor-empty', // Class for styling the placeholder
+      placeholder: props.placeholder,
+      emptyEditorClass: 'is-editor-empty', // Class for styling the placeholder
     }),
     // Add Italic if needed
     // Italic,
@@ -104,10 +101,10 @@ const setupEditor = () => {
 
   // Add CharacterCount extension if enabled
   if (props.showWordCount) {
-      extensions.push(CharacterCount.configure({
-          // limit: props.limit,
-          mode: 'character', // Set mode to 'character' for 字数
-      }));
+    extensions.push(CharacterCount.configure({
+      // limit: props.limit,
+      mode: 'character', // Set mode to 'character' for 字数
+    }));
   }
 
   // Convert the initial plain text modelValue to HTML paragraphs
@@ -118,28 +115,28 @@ const setupEditor = () => {
     editable: !props.disabled,
     extensions: extensions,
     editorProps: {
-        attributes: {
-            // Improve accessibility
-            role: 'textbox',
-            'aria-multiline': 'true',
-            // You might add spellcheck="false" if you handle it elsewhere
-            // spellcheck: "false",
-        },
+      attributes: {
+        // Improve accessibility
+        role: 'textbox',
+        'aria-multiline': 'true',
+        // You might add spellcheck="false" if you handle it elsewhere
+        // spellcheck: "false",
+      },
     },
     // --- Event Handlers ---
     onUpdate: () => {
       // When the editor content changes, get the text content.
       // Use blockSeparator: '\n' to ensure paragraphs are separated by a newline.
-      const outputText = editor.value.getText({ blockSeparator: '\n' });
+      const outputText = editor.value.getText({blockSeparator: '\n'});
 
       // Only emit update if the text content has actually changed
       // compared to the current modelValue to prevent infinite loops.
       if (outputText !== props.modelValue) {
-           emit('update:modelValue', outputText);
+        emit('update:modelValue', outputText);
       }
     },
-    onFocus: ({ event }) => emit('focus', event),
-    onBlur: ({ event }) => emit('blur', event),
+    onFocus: ({event}) => emit('focus', event),
+    onBlur: ({event}) => emit('blur', event),
   });
 };
 
@@ -148,7 +145,7 @@ const setupEditor = () => {
 watch(() => props.modelValue, (newValue) => {
   if (editor.value) {
     // Get the current editor content as plain text for comparison
-    const currentEditorText = editor.value.getText({ blockSeparator: '\n' });
+    const currentEditorText = editor.value.getText({blockSeparator: '\n'});
 
     // If the external value (newValue) is the same as the editor's current text,
     // do nothing to avoid unnecessary updates and cursor jumps.
@@ -187,13 +184,14 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .novel-editor {
+  height: 100%;
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
   background-color: var(--el-input-bg-color, #fff);
   display: flex;
   flex-direction: column;
   transition: border-color 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
-  overflow: hidden; 
+  overflow: hidden;
 }
 
 .novel-editor.is-disabled {
@@ -206,7 +204,7 @@ onBeforeUnmount(() => {
 .novel-editor.is-disabled .ProseMirror {
   cursor: not-allowed;
   color: var(--el-text-color-disabled);
-  -webkit-text-fill-color: var(--el-text-color-disabled); 
+  -webkit-text-fill-color: var(--el-text-color-disabled);
 }
 
 .novel-editor:focus-within {
@@ -221,50 +219,45 @@ onBeforeUnmount(() => {
   background-color: var(--el-bg-color-page, #f9f9f9);
   display: flex;
   align-items: center;
-  gap: 6px; 
+  gap: 6px;
 }
 
 .word-count {
-    font-size: 12px;
-    color: var(--el-text-color-secondary);
-    margin-left: auto; 
-    padding: 0 5px;
-    white-space: nowrap; 
-    user-select: none; 
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-left: auto;
+  padding: 0 5px;
+  white-space: nowrap;
+  user-select: none;
 }
 
 
 .editor-content-area-novel {
-  flex-grow: 1; 
-  padding: 20px 25px; 
-  overflow-y: auto; 
-  height: 400px; 
-  
-   min-height: 200px;
-  max-height: 60vh;
+  flex-grow: 1;
+  padding: 20px 25px;
+  overflow-y: auto;
 }
 
 
 .editor-content-area-novel > .ProseMirror {
-  outline: none; 
-  
+  outline: none;
+
   font-family: 'Source Serif 4', 'Songti SC', 'SimSun', serif;
-  font-size: 16px; 
-  line-height: 1.8; 
+  font-size: 16px;
+  line-height: 1.8;
   color: var(--el-text-color-primary);
-  white-space: pre-wrap; 
-  word-wrap: break-word; 
+  white-space: pre-wrap;
+  word-wrap: break-word;
   max-width: 800px;
-  margin: 0 auto; 
+  margin: 0 auto;
 }
 
 
 .editor-content-area-novel :deep(.ProseMirror p) {
-  min-height: 1.2em; 
-  margin-bottom: 1.2em; 
-  
-  
-  
+  min-height: 1.2em;
+  margin-bottom: 1.2em;
+
+
   text-indent: 0;
 }
 
@@ -275,18 +268,30 @@ onBeforeUnmount(() => {
 
 .editor-content-area-novel :deep(.ProseMirror p.is-editor-empty:first-child::before) {
   content: attr(data-placeholder);
-  float: left; 
+  float: left;
   color: var(--el-text-color-placeholder);
-  pointer-events: none; 
-  height: 0; 
+  pointer-events: none;
+  height: 0;
   font-style: italic;
-  
+
   text-indent: 0;
 }
 
 
-.editor-content-area-novel::-webkit-scrollbar { width: 6px; }
-.editor-content-area-novel::-webkit-scrollbar-track { background: transparent; }
-.editor-content-area-novel::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
-.editor-content-area-novel::-webkit-scrollbar-thumb:hover { background: #aaa; }
+.editor-content-area-novel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.editor-content-area-novel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-content-area-novel::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.editor-content-area-novel::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
 </style>

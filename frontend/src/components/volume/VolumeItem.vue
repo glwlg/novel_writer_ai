@@ -47,7 +47,6 @@
           @delete="emitDeleteChapter"
           @generate="emitGenerateScenes"
           @generate-scene-content="emitGenerateSceneContent"
-          @view="emitViewChapter"
       />
     </div>
   </el-collapse-item>
@@ -138,11 +137,6 @@ const emitGenerateScenes = (chapterId) => {
 // 转发生成场景事件
 const emitGenerateSceneContent = (sceneId) => {
   emit('generate-scene-content', sceneId);
-};
-
-// 转发查看章节内容事件
-const emitViewChapter = (chapterId) => {
-  emit('view-chapter', chapterId);
 };
 
 </script>

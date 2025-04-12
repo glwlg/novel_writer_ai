@@ -16,11 +16,6 @@
           <el-button :disabled="!!chapter.scenes?.length" link type="success" :icon="MagicStick"
                      @click.stop="handleGenerate" size="small"/>
         </el-tooltip>
-        <!-- View/Edit Content Button -->
-        <el-tooltip content="查看/编辑章节内容" placement="top">
-          <el-button :disabled="!chapter.content" link type="success" :icon="Document" @click.stop="handleView"
-                     size="small"/>
-        </el-tooltip>
         <el-tooltip content="删除章节" placement="top">
           <div>
             <el-popconfirm
@@ -59,7 +54,7 @@
 <script setup>
 import {computed} from 'vue';
 import {ElCard, ElButton, ElTooltip, ElCollapseTransition, ElText, ElPopconfirm} from 'element-plus';
-import {Delete, Document, Edit, MagicStick} from '@element-plus/icons-vue';
+import {Delete, Edit, MagicStick} from '@element-plus/icons-vue';
 import SceneItem from '@/components/scene/SceneItem.vue'; // Make sure path is correct
 
 // --- Props ---
@@ -76,7 +71,7 @@ const props = defineProps({
 });
 
 // --- Emits ---
-const emit = defineEmits(['select', 'edit', 'delete', 'generate', 'generate-scene-content', 'view']);
+const emit = defineEmits(['select', 'edit', 'delete', 'generate', 'generate-scene-content']);
 
 // --- Computed ---
 // Sort scenes within the component
@@ -104,10 +99,6 @@ const handleGenerate = () => {
 
 const handleSceneContentGenerate = (sceneId) => {
   emit('generate-scene-content', sceneId); // Emit chapter ID for scene generation
-};
-
-const handleView = () => {
-  emit('view', props.chapter.id); // Emit chapter ID to view content
 };
 
 </script>

@@ -17,7 +17,7 @@
 
     <!-- 主要内容区域 -->
     <el-row :gutter="20">
-      <el-col :span="24">
+      <el-col :span="8">
         <!-- 卷列表为空时的提示 -->
         <div v-if="!sortedVolumesWithChapters || sortedVolumesWithChapters.length === 0 && !isLoadingOverall"
              class="empty-list">
@@ -39,9 +39,41 @@
               @delete-chapter="confirmDeleteChapter"
               @generate-scenes="triggerScenesGeneration"
               @generate-scene-content="triggerGenerateSceneContent"
-              @view-chapter="openChapterDialog"
           />
         </el-collapse>
+      </el-col>
+      <el-col :span="16">
+
+        <el-card shadow="never">
+          <template #header>
+            <div class="content-card-header">
+              <span>章节内容</span>
+              <div>
+                <el-button type="primary" :icon="MagicStick" size="small" @click="triggerContentGeneration" :loading="isGenerating">
+                  内容优化
+                </el-button>
+                <el-button type="primary" size="small" @click="saveChapterContent" :loading="isGenerating">保存内容
+                </el-button>
+              </div>
+            </div>
+          </template>
+          <div v-if="isGenerating" class="content-loading">
+            <el-skeleton :rows="5" animated/>
+          </div>
+          <div v-else>
+            <RichTextEditor
+                style="height: 75vh;"
+                v-if="chapterStore.activeChapter"
+                v-model="chapterStore.activeChapter.content"
+                :editorProps="{
+              attributes: {
+                class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl m-5 focus:outline-none',
+              },
+            }"
+            />
+          </div>
+
+        </el-card>
       </el-col>
     </el-row>
 
@@ -74,39 +106,6 @@
           @cancel="chapterDialogVisible = false"/>
     </el-dialog>
 
-    <!-- 对话框：查看/编辑小说章节内容 -->
-    <el-dialog v-model="chapterContentDialogVisible" :title="chapterStore.activeChapter?.title || '章节内容'"
-               width="60vw"
-               @closed="chapterStore.clearActiveChapter()" :close-on-click-modal="false">
-      <!-- 内容加载状态 -->
-      <div v-if="isCreatingChapterContent" class="content-loading">
-        <el-skeleton :rows="5" animated/>
-      </div>
-      <!-- 富文本编辑器 -->
-      <div v-else>
-        <RichTextEditor
-            v-if="chapterStore.activeChapter"
-            v-model="chapterStore.activeChapter.content"
-            :editorProps="{
-              attributes: {
-                class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl m-5 focus:outline-none',
-              },
-            }"
-        />
-        <div v-else>无法加载章节内容</div>
-      </div>
-      <!-- 对话框底部操作 -->
-      <template #footer>
-         <span class="dialog-footer">
-           <el-button @click="chapterContentDialogVisible = false">关闭</el-button>
-           <el-button type="primary" @click="triggerContentGeneration" :loading="isCreatingChapterContent"
-                      :icon="MagicStick">
-             内容优化/生成
-           </el-button>
-         </span>
-      </template>
-    </el-dialog>
-
   </div>
 </template>
 
@@ -120,18 +119,17 @@ import {useSceneStore} from '@/store/scene';
 import {useProjectStore} from '@/store/project';
 // --- UI 组件 ---
 import {
-  ElPageHeader,
-  ElButton,
   ElAlert,
-  ElRow,
+  ElButton,
   ElCol,
   ElCollapse,
-  ElEmpty,
   ElDialog,
-  ElSkeleton,
+  ElEmpty,
   ElMessage,
   ElMessageBox,
-  ElPopconfirm
+  ElPageHeader,
+  ElRow,
+  ElSkeleton
 } from 'element-plus';
 import {MagicStick, Plus} from '@element-plus/icons-vue';
 // --- 自定义组件 ---
@@ -179,10 +177,6 @@ const isEditingChapter = ref(false);
 const chapterFormData = ref({id: null, volume_id: null, title: '', summary: '', order: 0, content: ''});
 // 是否正在保存章节
 const isSavingChapter = ref(false);
-
-// --- 章节内容对话框状态 ---
-// 章节内容对话框可见性
-const chapterContentDialogVisible = ref(false);
 // 是否正在生成章节内容
 const isCreatingChapterContent = ref(false);
 
@@ -378,6 +372,7 @@ const confirmDeleteVolume = async (volume) => {
 const selectChapter = (chapterId) => {
   // 如果点击的是已选中的章节，则取消选中；否则选中该章节
   selectedChapterId.value = selectedChapterId.value === chapterId ? null : chapterId;
+  chapterStore.activeChapter = chapterStore.chapters.find(ch => ch.id === chapterId);
 };
 
 // 打开新建章节对话框（由 VolumeItem 的 @create-chapter 事件触发）
@@ -442,6 +437,26 @@ const saveChapter = async (saveData) => {
   }
 };
 
+// 保存章节（由 ChapterForm 的 @save 事件触发）
+const saveChapterContent = async () => {
+  console.log('chapterStore.activeChapter', chapterStore.activeChapter);
+  if (!chapterStore.activeChapter) return; // 检查传入数据有效性
+  isSavingChapter.value = true; // 开始保存
+  const dataToSave = {
+    volume_id: chapterStore.activeChapter.volume_id, // 确保包含 volume_id
+    content: chapterStore.activeChapter.content,
+  };
+  try {
+    await chapterStore.updateChapter(chapterStore.activeChapter.id, dataToSave);
+    ElMessage.success('章节已更新');
+  } catch (error) {
+    console.error('保存章节失败:', error);
+    ElMessage.error(`保存章节失败: ${error.message || '未知错误'}`);
+  } finally {
+    isSavingChapter.value = false; // 结束保存
+  }
+};
+
 // 确认删除章节（由 VolumeItem 转发的 @delete-chapter 事件触发）
 const confirmDeleteChapter = async (chapterId) => {
   if (!chapterId) return;
@@ -481,27 +496,6 @@ const confirmDeleteChapter = async (chapterId) => {
 };
 
 // --- 章节内容与场景生成 ---
-
-// 打开章节内容对话框（由 VolumeItem 转发的 @view-chapter 事件触发）
-const openChapterDialog = async (chapterId) => {
-  if (!chapterId) return;
-  // 尝试从 store 中查找章节
-  const chapter = chapterStore.chapters.find(ch => ch.id === chapterId);
-  if (chapter) {
-    // 可选：如果内容不是总加载，这里可以触发一次详细加载
-    // await chapterStore.fetchChapterDetails(chapterId);
-    // 设置 store 中的活动章节
-    chapterStore.setActiveChapter(chapterId);
-    // 确保活动章节已设置成功
-    if (chapterStore.activeChapter) {
-      chapterContentDialogVisible.value = true; // 显示内容对话框
-    } else {
-      ElMessage.error("无法加载章节详细信息");
-    }
-  } else {
-    ElMessage.error("找不到章节信息");
-  }
-};
 
 // 触发章节内场景的 AI 生成（由 VolumeItem 转发的 @generate-scenes 事件触发）
 const triggerScenesGeneration = async (chapterId) => {
@@ -703,4 +697,9 @@ watch(volumes, (newVolumes) => {
   padding: 20px;
 }
 
+.content-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>
