@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import asc  # 用于排序
 from typing import List, Optional
 
-from app.models.structure import Volume
+from app.models.structure import Volume, Chapter
 from app.schemas.volume import VolumeCreate, VolumeUpdate
 from app.services.llm_service import get_embedding, prepare_text_for_embedding
 

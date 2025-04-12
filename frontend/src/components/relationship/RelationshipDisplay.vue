@@ -35,7 +35,6 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
 import { ElCard, ElDescriptions, ElDescriptionsItem, ElButton, ElIcon, ElTag, ElMessageBox } from 'element-plus';
 import { User, Link, Edit, Delete } from '@element-plus/icons-vue';
 import { format } from 'date-fns'; // 用于格式化日期

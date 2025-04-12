@@ -3,7 +3,8 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
-from .chapter import ChapterReadMinimal
+from .chapter import ChapterReadMinimal, ChapterRead
+
 
 class VolumeBase(BaseModel):
     title: str
@@ -28,7 +29,7 @@ class VolumeRead(VolumeBase):
     updated_at: Optional[datetime] = None
     # 嵌套显示该卷下的章节（简化信息）
     # 注意：需要在获取数据的查询中明确加载 chapters (e.g., using options(selectinload(Volume.chapters)))
-    chapters: List[ChapterReadMinimal] = []
+    chapters: List[ChapterRead] = []
 
     model_config = ConfigDict(from_attributes=True)
 

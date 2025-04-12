@@ -1,13 +1,16 @@
 // src/store/volume.js
 import {defineStore} from 'pinia';
 import {volumeAPI} from '@/services/volumeAPI'; // Adjust path
-import {generationAPI} from "@/services/generationAPI.js"; // To fetch chapters for a volume
+import {generationAPI} from "@/services/generationAPI.js";
+import {useSceneStore} from "@/store/scene.js";
+import {useChapterStore} from "@/store/chapter.js"; // To fetch chapters for a volume
 
 export const useVolumeStore = defineStore('volume', {
     state: () => ({
         volumes: [], // List for the current project, potentially enriched with minimal chapters
         activeVolume: null,
         isLoading: false,
+        isGenerating: false,
         error: null,
         // activeVolume: null, // Optional: If needed for focus
     }),
@@ -35,7 +38,10 @@ export const useVolumeStore = defineStore('volume', {
                 // API returns VolumeRead which includes chapters. If not, fetch them separately.
                 // Assuming API returns VolumeRead with chapters array
                 this.volumes = response.data;
-
+                const chapterStore = useChapterStore();
+                const sceneStore = useSceneStore();
+                await chapterStore.loadChaptersFromVolume(this.volumes);
+                await sceneStore.loadScenesFromChapter(chapterStore.chapters);
             } catch (err) {
                 this._setError(err);
                 this.volumes = [];
@@ -89,6 +95,10 @@ export const useVolumeStore = defineStore('volume', {
                 throw err;
             }
         },
+        // removeSceneFromVolume(volumeId, chapterId, sceneId) {
+        //     const volume = this.volumes.find(v => v.id === volumeId);
+        //
+        // }
         // --- Generation ---
         async generateVolumeChapters(volumeId) {
             if (!volumeId) return;

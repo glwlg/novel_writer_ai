@@ -8,6 +8,18 @@
         {{ statusText }}
       </el-tag>
       <el-popconfirm
+          title="这将使用 AI 生成新的场景内容，可能会覆盖现有内容。是否继续？"
+          confirm-button-text="生成"
+          cancel-button-text="取消"
+          @confirm="triggerRAGGeneration"
+          width="250"
+      >
+        <template #reference>
+          <el-button link type="success" :icon="MagicStick" @click.stop size="default"
+                     title="生成内容"></el-button>
+        </template>
+      </el-popconfirm>
+      <el-popconfirm
           title="确定删除此场景吗？"
           confirm-button-text="确认删除"
           cancel-button-text="取消"
@@ -29,7 +41,7 @@
 import {useRouter} from 'vue-router';
 import {computed, defineEmits} from 'vue';
 import {ElMessage, ElMessageBox, ElPopconfirm} from "element-plus";
-import {Delete} from "@element-plus/icons-vue";
+import {Delete, MagicStick} from "@element-plus/icons-vue";
 import {useSceneStore} from "@/store/index.js";
 // --- Stores ---
 const sceneStore = useSceneStore();
@@ -43,7 +55,7 @@ const props = defineProps({
 
 // --- Router ---
 const router = useRouter();
-
+const emit = defineEmits(['generate']);
 // --- Methods ---
 const goToSceneDetail = () => {
   if (props.scene && props.scene.id) {
@@ -61,19 +73,22 @@ const statusType = computed(() => {
     case 'PLANNED':
       return 'info';
     case 'DRAFTED':
-      return ''; // default
+      return 'info';
     case 'REVISING':
       return 'warning';
     case 'COMPLETED':
       return 'success';
     case 'GENERATING':
-      return 'primary'; // 假设有生成中状态
+      return 'primary';
     case 'GENERATION_FAILED':
-      return 'danger'; // 假设有生成失败状态
+      return 'danger';
     default:
       return 'info';
   }
 });
+const triggerRAGGeneration = async () => {
+  emit('generate', props.scene.id); // Emit chapter ID for scene generation
+};
 const confirmDeleteScene = async () => {
   if (!props.scene.id) return;
   try {

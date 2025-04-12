@@ -1,45 +1,62 @@
 // src/store/chapter.js
 import {defineStore} from 'pinia';
 import {chapterAPI} from '@/services/chapterAPI'; // Adjust path
-import {sceneAPI} from '@/services/sceneAPI';
 import {generationAPI} from "@/services/generationAPI.js";
-import {useVolumeStore} from "@/store/volume.js"; // To fetch scenes for a chapter
 
 export const useChapterStore = defineStore('chapter', {
     state: () => ({
         chapters: [], // List for the current project, potentially enriched with minimal scenes
         activeChapter: null,
         isLoading: false,
+        isGenerating: false,
         error: null,
         // activeChapter: null, // Optional: If needed for focus
     }),
     actions: {
-        _setLoading(value) {
-            this.isLoading = value;
+        _setLoading(type, value) {
+            if (type === 'fatch') this.isLoading = value;
+            if (type === 'generating') this.isGenerating = value;
         },
-        _setError(error) {
-            this.error = error ? (error.response?.data?.detail || error.message) : null;
+        _setError(type, error) {
+            const message = error ? (error.response?.data?.detail || error.message) : null;
+            if (type === 'fatch') this.error = message;
+            if (type === 'generating') this.generationError = message;
         },
         clearChapters() {
             this.chapters = [];
             this.error = null;
             this.isLoading = false;
         },
+        setActiveChapter(chapterId) {
+            const chapter = this.chapters.find(ch => ch.id === chapterId);
+            this.activeChapter = chapter || null;
+        },
+        clearActiveChapter() {
+            this.activeChapter = null;
+        },
+        loadChaptersFromVolume(volumes) {
+            this.chapters = []
+            for (const volume of volumes) {
+                for (const chapter of volume.chapters) {
+                    this.chapters.push({...chapter, volume_id: volume.id});
+                }
+            }
+        },
         async fetchChapters(projectId) {
             if (!projectId) {
                 this.clearChapters();
                 return;
             }
-            this._setLoading(true);
-            this._setError(null);
+            this._setLoading('fatch', true);
+            this._setError('fatch', null);
             try {
                 const response = await chapterAPI.getChaptersByProject(projectId);
                 this.chapters = response.data;
             } catch (err) {
-                this._setError(err);
+                this._setError('fatch', err);
                 this.chapters = [];
             } finally {
-                this._setLoading(false);
+                this._setLoading('fatch', false);
             }
         },
         async fetchChaptersByVolumeId(volumeId) {
@@ -47,20 +64,20 @@ export const useChapterStore = defineStore('chapter', {
                 this.clearChapters();
                 return;
             }
-            this._setLoading(true);
-            this._setError(null);
+            this._setLoading('fatch', true);
+            this._setError('fatch', null);
             try {
                 const response = await chapterAPI.getChaptersByProject(volumeId);
                 this.chapters = response.data;
             } catch (err) {
-                this._setError(err);
+                this._setError('fatch', err);
                 this.chapters = [];
             } finally {
-                this._setLoading(false);
+                this._setLoading('fatch', false);
             }
         },
         async createChapter(projectId, volumeId, chapterData) {
-            this._setError(null);
+            this._setError('fatch', null);
             const payload = {...chapterData, project_id: projectId};
             try {
                 const response = await chapterAPI.createChapter(projectId, volumeId, payload);
@@ -70,12 +87,12 @@ export const useChapterStore = defineStore('chapter', {
                 this.chapters.sort((a, b) => a.order - b.order);
                 return response.data;
             } catch (err) {
-                this._setError(err);
+                this._setError('fatch', err);
                 throw err;
             }
         },
         async updateChapter(chapterId, chapterUpdateData) {
-            this._setError(null);
+            this._setError('fatch', null);
             try {
                 const response = await chapterAPI.updateChapter(chapterId, chapterUpdateData);
                 const index = this.chapters.findIndex(ch => ch.id === chapterId);
@@ -90,18 +107,18 @@ export const useChapterStore = defineStore('chapter', {
                 }
                 return response.data;
             } catch (err) {
-                this._setError(err);
+                this._setError('fatch', err);
                 throw err;
             }
         },
         async deleteChapter(chapterId) {
-            this._setError(null);
+            this._setError('fatch', null);
             try {
                 const response = await chapterAPI.deleteChapter(chapterId);
                 this.chapters = this.chapters.filter(ch => ch.id !== chapterId);
                 return response.data;
             } catch (err) {
-                this._setError(err);
+                this._setError('fatch', err);
                 throw err;
             }
         },
@@ -121,13 +138,15 @@ export const useChapterStore = defineStore('chapter', {
             const chapter = this.chapters.find(ch => ch.id === chapterId);
             if (chapter && chapter.scenes) {
                 chapter.scenes = chapter.scenes.filter(s => s.id !== sceneId);
+                // const volumeStore = useVolumeStore();
+                // volumeStore.removeSceneFromVolume(chapter.volume_id, sceneId);
             }
         },
         // --- Generation ---
         async generateChapterScenes(chapterId) {
             if (!chapterId) return;
-            this._setLoading(true);
-            this._setError('generating');
+            this._setLoading('generating', true);
+            this._setError('generating', null);
             try {
                 const response = await generationAPI.generateChapterScenes(chapterId);
                 const updatedChapter = response.data; // API returns the updated scene
@@ -141,22 +160,21 @@ export const useChapterStore = defineStore('chapter', {
 
                 return updatedChapter;
             } catch (err) {
-                this._setError(err);
+                this._setError('generating', err);
                 // Potentially update scene status to 'generation_failed' if desired
                 // if (this.activeScene?.id === sceneId) {
                 //    this.activeScene.status = 'generation_failed'; // Assuming SceneStatus enum/type allows this
                 // }
                 throw err; // Re-throw for component feedback
             } finally {
-                console.log("===========generating finished===========");
-                this._setLoading(false);
+                this._setLoading('generating', false);
             }
         },
         // --- Generation ---
         async generateChapterContent(chapterId) {
             if (!chapterId) return;
-            this._setLoading(true);
-            this._setError('generating');
+            this._setLoading('generating', true);
+            this._setError('generating', null);
             try {
                 const response = await generationAPI.generateChapterContent(chapterId);
                 const updatedChapter = response.data; // API returns the updated scene
@@ -170,14 +188,14 @@ export const useChapterStore = defineStore('chapter', {
 
                 return updatedChapter;
             } catch (err) {
-                this._setError(err);
+                this._setError('generating', err);
                 // Potentially update scene status to 'generation_failed' if desired
                 // if (this.activeScene?.id === sceneId) {
                 //    this.activeScene.status = 'generation_failed'; // Assuming SceneStatus enum/type allows this
                 // }
                 throw err; // Re-throw for component feedback
             } finally {
-                this._setLoading(false);
+                this._setLoading('generating', false);
             }
         }
     },

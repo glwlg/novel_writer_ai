@@ -1,4 +1,3 @@
-// ChapterItem.vue
 <template>
   <el-card shadow="never" class="chapter-item" :class="{ 'is-active': isSelected }">
     <div class="chapter-header" @click="handleSelect">
@@ -22,21 +21,21 @@
           <el-button :disabled="!chapter.content" link type="success" :icon="Document" @click.stop="handleView"
                      size="small"/>
         </el-tooltip>
-        <!-- Delete Button (emits delete event, confirmation handled by parent) -->
         <el-tooltip content="删除章节" placement="top">
-
-          <el-popconfirm
-              :title="`确定删除章节 '${chapter?.title}' 吗？章节下的所有场景也会被删除！`"
-              confirm-button-text="确认删除"
-              cancel-button-text="取消"
-              @confirm="handleDelete"
-              width="300"
-              ref="chapterDeleteConfirmRef"
-          >
-            <template #reference>
-               <el-button link type="danger" :icon="Delete" @click.stop size="small"/>
-            </template>
-          </el-popconfirm>
+          <div>
+            <el-popconfirm
+                :title="`确定删除章节 '${chapter?.title}' 吗？章节下的所有场景也会被删除！`"
+                confirm-button-text="确认删除"
+                cancel-button-text="取消"
+                @confirm="handleDelete"
+                width="300"
+                ref="chapterDeleteConfirmRef"
+            >
+              <template #reference>
+                <el-button link type="danger" :icon="Delete" @click.stop size="small"/>
+              </template>
+            </el-popconfirm>
+          </div>
         </el-tooltip>
       </div>
     </div>
@@ -48,7 +47,9 @@
         </div>
         <div v-else class="scene-list-in-chapter">
           <!-- Ensure SceneItem is imported -->
-          <SceneItem v-for="scene in sortedScenes" :key="scene.id" :scene="scene" class="scene-item-display"/>
+          <SceneItem v-for="scene in sortedScenes" :key="scene.id" :scene="scene"
+                     @generate="handleSceneContentGenerate"
+                     class="scene-item-display"/>
         </div>
       </div>
     </el-collapse-transition>
@@ -75,8 +76,7 @@ const props = defineProps({
 });
 
 // --- Emits ---
-// Added 'select', 'generate', 'view'
-const emit = defineEmits(['select', 'edit', 'delete', 'generate', 'view']);
+const emit = defineEmits(['select', 'edit', 'delete', 'generate', 'generate-scene-content', 'view']);
 
 // --- Computed ---
 // Sort scenes within the component
@@ -100,6 +100,10 @@ const handleDelete = () => {
 
 const handleGenerate = () => {
   emit('generate', props.chapter.id); // Emit chapter ID for scene generation
+};
+
+const handleSceneContentGenerate = (sceneId) => {
+  emit('generate-scene-content', sceneId); // Emit chapter ID for scene generation
 };
 
 const handleView = () => {

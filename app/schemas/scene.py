@@ -74,6 +74,7 @@ class SceneRead(SceneBase):
 class SceneReadMinimal(BaseModel):
     id: int
     title: Optional[str]
+    chapter_id: int
     order_in_chapter: int
     status: SceneStatus
 

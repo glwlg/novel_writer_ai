@@ -39,6 +39,14 @@ export const useSceneStore = defineStore('scene', {
             this.isLoadingDetails = false;
             this.error = null;
         },
+        loadScenesFromChapter(chapters) {
+            this.scenes = []
+            for (const chapter of chapters) {
+                for (const scene of chapter.scenes) {
+                    this.scenes.push({...scene, chapter_id: chapter.id});
+                }
+            }
+        },
         async fetchSceneDetails(sceneId) {
             if (!sceneId) {
                 this.clearActiveScene();
@@ -147,8 +155,11 @@ export const useSceneStore = defineStore('scene', {
                 if (this.activeScene?.id === sceneId) {
                     this.activeScene = null;
                 }
+                console.log("scenes=====",this.scenes);
                 // Remove from scenes list
                 this.scenes = this.scenes.filter(s => s.id !== sceneId);
+                console.log("scenes=====",this.scenes);
+
                 // Remove from chapter list
                 if (chapterId) {
                     const chapterStore = useChapterStore();

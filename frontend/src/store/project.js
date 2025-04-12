@@ -62,24 +62,6 @@ export const useProjectStore = defineStore('project', {
                 const response = await projectAPI.getProject(projectId);
                 this.currentProject = response.data;
 
-                // **Crucial: After fetching project details, trigger fetching related data**
-                const characterStore = useCharacterStore();
-                const settingStore = useSettingStore();
-                const relationshipStore = useRelationshipStore();
-                const volumeStore = useVolumeStore();
-                const chapterStore = useChapterStore();
-                const sceneStore = useSceneStore(); // For unassigned scenes
-
-                // Use Promise.all for parallel fetching
-                await Promise.all([
-                    characterStore.fetchCharacters(projectId),
-                    settingStore.fetchSettings(projectId),
-                    relationshipStore.fetchRelationships(projectId),
-                    volumeStore.fetchVolumes(projectId),
-                    chapterStore.fetchChapters(projectId),
-                    sceneStore.fetchScenes(projectId) // Fetch unassigned scenes for the project
-                ]);
-
             } catch (err) {
                 this._setError(err);
                 this.currentProject = null; // Ensure project is null on error
