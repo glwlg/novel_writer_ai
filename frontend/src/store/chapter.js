@@ -2,7 +2,8 @@
 import {defineStore} from 'pinia';
 import {chapterAPI} from '@/services/chapterAPI'; // Adjust path
 import {sceneAPI} from '@/services/sceneAPI';
-import {generationAPI} from "@/services/generationAPI.js"; // To fetch scenes for a chapter
+import {generationAPI} from "@/services/generationAPI.js";
+import {useVolumeStore} from "@/store/volume.js"; // To fetch scenes for a chapter
 
 export const useChapterStore = defineStore('chapter', {
     state: () => ({
@@ -33,23 +34,7 @@ export const useChapterStore = defineStore('chapter', {
             this._setError(null);
             try {
                 const response = await chapterAPI.getChaptersByProject(projectId);
-                // API returns ChapterRead which includes scenes. If not, fetch them separately.
-                // Assuming API returns ChapterRead with scenes array
                 this.chapters = response.data;
-
-                // If API only returns chapter metadata, you'd loop and fetch scenes:
-                // const chaptersData = response.data;
-                // const chaptersWithScenes = await Promise.all(chaptersData.map(async (chap) => {
-                //    try {
-                //      const scenesResponse = await sceneAPI.getScenesByChapter(chap.id);
-                //      return { ...chap, scenes: scenesResponse.data };
-                //    } catch (sceneErr) {
-                //      console.error(`Failed to fetch scenes for chapter ${chap.id}:`, sceneErr);
-                //      return { ...chap, scenes: [] }; // Assign empty array on error
-                //    }
-                // }));
-                // this.chapters = chaptersWithScenes;
-
             } catch (err) {
                 this._setError(err);
                 this.chapters = [];
@@ -57,11 +42,28 @@ export const useChapterStore = defineStore('chapter', {
                 this._setLoading(false);
             }
         },
-        async createChapter(projectId, chapterData) {
+        async fetchChaptersByVolumeId(volumeId) {
+            if (!volumeId) {
+                this.clearChapters();
+                return;
+            }
+            this._setLoading(true);
+            this._setError(null);
+            try {
+                const response = await chapterAPI.getChaptersByProject(volumeId);
+                this.chapters = response.data;
+            } catch (err) {
+                this._setError(err);
+                this.chapters = [];
+            } finally {
+                this._setLoading(false);
+            }
+        },
+        async createChapter(projectId, volumeId, chapterData) {
             this._setError(null);
             const payload = {...chapterData, project_id: projectId};
             try {
-                const response = await chapterAPI.createChapter(projectId, payload);
+                const response = await chapterAPI.createChapter(projectId, volumeId, payload);
                 // API might return ChapterRead with empty scenes array initially
                 this.chapters.push(response.data);
                 // You might need to re-sort if order matters immediately
@@ -97,10 +99,6 @@ export const useChapterStore = defineStore('chapter', {
             try {
                 const response = await chapterAPI.deleteChapter(chapterId);
                 this.chapters = this.chapters.filter(ch => ch.id !== chapterId);
-                // Note: Associated scenes are deleted by backend cascade,
-                // but if you manage scene state separately, ensure it's updated.
-                // const sceneStore = useSceneStore();
-                // sceneStore.removeScenesByChapter(chapterId); // Implement this in sceneStore if needed
                 return response.data;
             } catch (err) {
                 this._setError(err);
@@ -125,11 +123,40 @@ export const useChapterStore = defineStore('chapter', {
                 chapter.scenes = chapter.scenes.filter(s => s.id !== sceneId);
             }
         },
-        // --- RAG Generation ---
+        // --- Generation ---
+        async generateChapterScenes(chapterId) {
+            if (!chapterId) return;
+            this._setLoading(true);
+            this._setError('generating');
+            try {
+                const response = await generationAPI.generateChapterScenes(chapterId);
+                const updatedChapter = response.data; // API returns the updated scene
+
+                // Update the active scene state if it's the one being generated
+                if (this.activeChapter?.id === chapterId) {
+                    // Merge carefully, especially if generation only returns partial data
+                    // Assuming it returns the full SceneRead schema:
+                    this.activeChapter = updatedChapter;
+                }
+
+                return updatedChapter;
+            } catch (err) {
+                this._setError(err);
+                // Potentially update scene status to 'generation_failed' if desired
+                // if (this.activeScene?.id === sceneId) {
+                //    this.activeScene.status = 'generation_failed'; // Assuming SceneStatus enum/type allows this
+                // }
+                throw err; // Re-throw for component feedback
+            } finally {
+                console.log("===========generating finished===========");
+                this._setLoading(false);
+            }
+        },
+        // --- Generation ---
         async generateChapterContent(chapterId) {
             if (!chapterId) return;
-            this._setLoading('generating', true);
-            this._setError('generating', null);
+            this._setLoading(true);
+            this._setError('generating');
             try {
                 const response = await generationAPI.generateChapterContent(chapterId);
                 const updatedChapter = response.data; // API returns the updated scene
@@ -143,14 +170,14 @@ export const useChapterStore = defineStore('chapter', {
 
                 return updatedChapter;
             } catch (err) {
-                this._setError('generating', err);
+                this._setError(err);
                 // Potentially update scene status to 'generation_failed' if desired
                 // if (this.activeScene?.id === sceneId) {
                 //    this.activeScene.status = 'generation_failed'; // Assuming SceneStatus enum/type allows this
                 // }
                 throw err; // Re-throw for component feedback
             } finally {
-                this._setLoading('generating', false);
+                this._setLoading(false);
             }
         }
     },

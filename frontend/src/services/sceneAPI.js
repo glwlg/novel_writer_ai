@@ -22,6 +22,17 @@ class SceneAPI {
     };
 
     /**
+     * 获取项目中的场景列表
+     * @param {number} projectId - 项目 ID
+     * @param {object} params - 查询参数 (例如 { skip: 0, limit: 100 })
+     * @returns {Promise<Array<object>>} - 场景列表 (符合 SceneReadMinimal schema)
+     */
+    getScenesByProject = async (projectId, params) => {
+        return apiClient.get(`/projects/${projectId}/scenes`, {params});
+    };
+
+
+    /**
      * 获取项目中未分配给任何章节的场景列表
      * @param {number} projectId - 项目 ID
      * @param {object} params - 查询参数 (例如 { skip: 0, limit: 100 })

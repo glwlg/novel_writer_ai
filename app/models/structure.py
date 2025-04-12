@@ -14,21 +14,43 @@ class SceneStatus(enum.Enum):
     GENERATING = "GENERATING"
     GENERATION_FAILED = "GENERATION_FAILED"
 
-class Chapter(Base):
-    __tablename__ = "chapters"
+#卷
+class Volume(Base):
+    __tablename__ = "volumes"
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     title = Column(String, nullable=False)
     summary = Column(Text, nullable=True) # What happens in this chapter overall
-    content = Column(Text, nullable=True) # 完整小说内容
     order = Column(Integer, nullable=False, default=0) # Order within the project
     embedding = Column(Vector(1024), nullable=True) # Embedding of the summary for high-level context
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
+    project = relationship("Project", back_populates="volumes")
+    chapters = relationship("Chapter", back_populates="volume", order_by="Chapter.order", cascade="all, delete-orphan")
+    # scenes = relationship("Scene", back_populates="chapter", order_by="Scene.order_in_chapter", cascade="all, delete-orphan")
+
+    __table_args__ = (UniqueConstraint('project_id', 'title', name='_project_volume_title_uc'),)
+
+class Chapter(Base):
+    __tablename__ = "chapters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    volume_id = Column(Integer, ForeignKey("volumes.id"), nullable=False)
+    title = Column(String, nullable=False)
+    summary = Column(Text, nullable=True) # What happens in this chapter overall
+    content = Column(Text, nullable=True) # 完整小说内容
+    order = Column(Integer, nullable=False, default=0) # Order within the volume
+    embedding = Column(Vector(1024), nullable=True) # Embedding of the summary for high-level context
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
     project = relationship("Project", back_populates="chapters")
+    volume = relationship("Volume", back_populates="chapters")
     scenes = relationship("Scene", back_populates="chapter", order_by="Scene.order_in_chapter", cascade="all, delete-orphan")
 
     __table_args__ = (UniqueConstraint('project_id', 'title', name='_project_chapter_title_uc'),)
@@ -52,7 +74,7 @@ class Scene(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    project = relationship("Project", back_populates="scenes")
+    # project = relationship("Project", back_populates="scenes")
     chapter = relationship("Chapter", back_populates="scenes")
     characters = relationship("Character", secondary="scene_character_association", back_populates="scenes")
     setting_elements = relationship("SettingElement", secondary="scene_setting_association", back_populates="scenes") # Locations, key items used etc.

@@ -14,9 +14,11 @@ router = APIRouter()
 
 # Define path operations for Chapters
 
-@router.post("/projects/{project_id}/chapters", response_model=ChapterRead, status_code=status.HTTP_201_CREATED)
+@router.post("/projects/{project_id}/{volume_id}/chapters", response_model=ChapterRead,
+             status_code=status.HTTP_201_CREATED)
 async def create_new_chapter(
         project_id: int,
+        volume_id: int,
         chapter: ChapterCreate,
         db: Session = Depends(get_db)
 ):
@@ -25,11 +27,10 @@ async def create_new_chapter(
     Requires project_id in the path and chapter data in the body.
     Ensures the created chapter belongs to the specified project.
     """
-    # Ensure the project_id in the path matches the one potentially in the body (or enforce path only)
-    if chapter.project_id != project_id:
+    if chapter.project_id != project_id or chapter.volume_id != volume_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Project ID in path does not match project_id in request body."
+            detail="Project ID in path does not match project_id or volume_id in request body."
         )
     try:
         created_chapter = await chapter_service.create_chapter(db=db, chapter=chapter)
@@ -59,7 +60,32 @@ async def read_project_chapters(
             if chapter.content is None:
                 chapter.content = ""  # 确保 content 字段不为 None
                 if chapter.scenes:
-                    for scene in  chapter.scenes:
+                    for scene in chapter.scenes:
+                        if scene.generated_content:
+                            chapter.content += scene.generated_content
+        return chapters
+    except ValueError as e:  # Project not found from service
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/volumes/{volume_id}/chapters", response_model=List[ChapterRead])  # Use ChapterRead to include scenes
+async def read_volume_chapters(
+        volume_id: int,
+        skip: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=200),
+        db: Session = Depends(get_db)
+):
+    """
+    Retrieve all chapters for a specific project, ordered by their 'order' field.
+    Includes minimal scene information nested within each chapter.
+    """
+    try:
+        chapters = chapter_service.get_chapters_by_volume(db=db, volume_id=volume_id, skip=skip, limit=limit)
+        for chapter in chapters:
+            if chapter.content is None:
+                chapter.content = ""  # 确保 content 字段不为 None
+                if chapter.scenes:
+                    for scene in chapter.scenes:
                         if scene.generated_content:
                             chapter.content += scene.generated_content
         return chapters
@@ -101,15 +127,15 @@ async def update_existing_chapter(
     return updated_chapter
 
 
-@router.delete("/chapters/{chapter_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_existing_chapter(
+@router.delete("/chapters/{chapter_id}", response_model=ChapterRead)
+def delete_existing_chapter(
         chapter_id: int,
         db: Session = Depends(get_db)
 ):
     """
     Delete a chapter by its ID. Associated scenes will also be deleted due to cascade.
     """
-    deleted_chapter = await chapter_service.delete_chapter(db=db, chapter_id=chapter_id)
+    deleted_chapter = chapter_service.delete_chapter(db=db, chapter_id=chapter_id)
     if deleted_chapter is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter not found")
-    return None  # Return No Content on successful deletion
+    return deleted_chapter

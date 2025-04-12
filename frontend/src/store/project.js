@@ -6,9 +6,11 @@ import {useSettingStore} from './setting';
 import {useRelationshipStore} from './relationship';
 import {useChapterStore} from './chapter';
 import {useSceneStore} from './scene';
+import {useVolumeStore} from "@/store/volume.js";
 
 export const useProjectStore = defineStore('project', {
     state: () => ({
+        activeProject: null,
         projectsList: [],
         currentProject: null, // Holds the full details of the currently selected project
         isLoadingList: false,
@@ -64,6 +66,7 @@ export const useProjectStore = defineStore('project', {
                 const characterStore = useCharacterStore();
                 const settingStore = useSettingStore();
                 const relationshipStore = useRelationshipStore();
+                const volumeStore = useVolumeStore();
                 const chapterStore = useChapterStore();
                 const sceneStore = useSceneStore(); // For unassigned scenes
 
@@ -72,8 +75,9 @@ export const useProjectStore = defineStore('project', {
                     characterStore.fetchCharacters(projectId),
                     settingStore.fetchSettings(projectId),
                     relationshipStore.fetchRelationships(projectId),
+                    volumeStore.fetchVolumes(projectId),
                     chapterStore.fetchChapters(projectId),
-                    sceneStore.fetchUnassignedScenes(projectId) // Fetch unassigned scenes for the project
+                    sceneStore.fetchScenes(projectId) // Fetch unassigned scenes for the project
                 ]);
 
             } catch (err) {

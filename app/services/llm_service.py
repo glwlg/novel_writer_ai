@@ -17,17 +17,12 @@ async def generate_text_stream(messages, max_tokens: int = 150) -> str:
                                                   messages=messages_data,
                                                   max_tokens=max_tokens,
                                                   stream=True,
-                                                  temperature=0.7)
+                                                  temperature=1)
         response_str = ''
         for part in response:
             if len(part.choices) == 0:
                 continue
             choice = part.choices[0]
-            if choice.finish_reason == 'stop':
-                break
-            # error handling
-            if choice.finish_reason == 'length':
-                break
             delta = choice.delta
             if delta == {} or delta.content is None:
                 char = ''
@@ -35,6 +30,10 @@ async def generate_text_stream(messages, max_tokens: int = 150) -> str:
                 char = delta.content
             print(char)
             response_str += char
+            if choice.finish_reason == 'stop':
+                break
+            if choice.finish_reason == 'length':
+                break
         return response_str
     except Exception as e:
         print(f"Error calling OpenAI API: {e}")

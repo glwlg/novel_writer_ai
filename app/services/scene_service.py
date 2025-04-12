@@ -57,7 +57,7 @@ async def create_scene(db: Session, scene: SceneCreate) -> Scene:
 def get_scene(db: Session, scene_id: int) -> Optional[Scene]:
     """Gets a single scene by ID."""
     return db.query(Scene).options(
-        selectinload(Scene.project)
+        selectinload(Scene.chapter)
     ).filter(Scene.id == scene_id).first()
 
 
@@ -71,6 +71,18 @@ def get_scenes_by_chapter(db: Session, chapter_id: int, skip: int = 0, limit: in
     return db.query(Scene).filter(
         Scene.chapter_id == chapter_id).order_by(Scene.order_in_chapter).all()
 
+
+def get_scenes_by_project(db: Session, project_id: int, skip: int = 0, limit: int = 100) -> Sequence[
+    Scene]:
+    """Gets scenes belonging to a project ."""
+    # Check if project exists
+    project = db.get(Project, project_id)
+    if not project:
+        raise ValueError(f"Project with id {project_id} not found")
+
+    return db.query(Scene).filter(
+        Scene.project_id == project_id).order_by(
+        Scene.created_at).offset(skip).limit(limit).all()
 
 def get_scenes_by_project_unassigned(db: Session, project_id: int, skip: int = 0, limit: int = 100) -> Sequence[
     Scene]:

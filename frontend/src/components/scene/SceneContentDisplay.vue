@@ -4,7 +4,6 @@
       <template #header>
         <div class="card-header">
           <span>场景内容</span>
-          <!-- 可选：添加编辑/保存按钮，如果编辑器在此组件内管理保存 -->
            <el-button v-if="!readOnly" type="primary" size="small" @click="saveContent" :loading="isSavingContent">保存内容</el-button>
         </div>
       </template>

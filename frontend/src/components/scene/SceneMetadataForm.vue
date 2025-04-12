@@ -67,12 +67,12 @@
             </el-select>
           </el-form-item>
        </el-col>
-        <el-col :span="12">
-           <!-- 章节内排序，如果需要在此编辑的话 -->
-           <el-form-item label="章节内排序" prop="order_in_chapter">
-             <el-input-number v-model="formData.order_in_chapter" :min="0" controls-position="right" style="width: 100%;" />
-           </el-form-item>
-        </el-col>
+<!--        <el-col :span="12">-->
+<!--           &lt;!&ndash; 章节内排序，如果需要在此编辑的话 &ndash;&gt;-->
+<!--           <el-form-item label="章节内排序" prop="order_in_chapter">-->
+<!--             <el-input-number :disabled="true" v-model="formData.order_in_chapter" :min="0" controls-position="right" style="width: 100%;" />-->
+<!--           </el-form-item>-->
+<!--        </el-col>-->
     </el-row>
 
     <el-form-item>

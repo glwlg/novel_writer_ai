@@ -1,5 +1,6 @@
 # backend/app/schemas/__init__.py
 
+from .volume import VolumeCreate, VolumeRead, VolumeUpdate, VolumeReadMinimal
 from .chapter import ChapterCreate, ChapterRead, ChapterUpdate, ChapterReadMinimal
 from .character import CharacterCreate, CharacterRead, CharacterUpdate
 from .project import ProjectCreate, ProjectRead, ProjectUpdate

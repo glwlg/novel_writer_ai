@@ -1,30 +1,31 @@
 <template>
   <el-form
-    ref="chapterFormRef"
-    :model="formData"
-    :rules="rules"
-    label-position="top"
-    @submit.prevent="handleSubmit"
+      ref="chapterFormRef"
+      :model="formData"
+      :rules="rules"
+      label-position="top"
+      @submit.prevent="handleSubmit"
   >
+    <el-form-item label="" prop="title">
+      <el-text size="large" type="info" style="margin-left: 10px;">第{{ initialData.order + 1 }}章</el-text>
+    </el-form-item>
     <el-form-item label="章节标题" prop="title">
-      <el-input v-model="formData.title" placeholder="请输入章节标题" />
+      <el-input v-model="formData.title" placeholder="请输入章节标题"/>
     </el-form-item>
 
     <el-form-item label="章节概要" prop="summary">
       <el-input
-        v-model="formData.summary"
-        type="textarea"
-        :rows="4"
-        placeholder="请输入章节概要（可选）"
+          v-model="formData.summary"
+          type="textarea"
+          :rows="4"
+          placeholder="请输入章节概要（可选）"
       />
     </el-form-item>
 
     <!-- 编辑模式下可能显示章节 ID (只读) -->
-    <!-- <el-form-item v-if="isEditing" label="章节 ID">
-      <el-input :value="initialData.id" disabled />
-    </el-form-item> -->
-
-     <!-- 隐藏 project_id，创建时自动添加 -->
+    <!--    <el-form-item v-if="isEditing" label="章节 ID">-->
+    <!--      <el-input :value="initialData.id" disabled/>-->
+    <!--    </el-form-item>-->
 
     <el-form-item>
       <el-button type="primary" native-type="submit" :loading="isLoading">
@@ -33,14 +34,14 @@
       <el-button @click="handleCancel">取消</el-button>
     </el-form-item>
 
-     <!-- 显示 API 错误 -->
-     <el-alert v-if="apiError" :title="apiError" type="error" show-icon :closable="false"/>
+    <!-- 显示 API 错误 -->
+    <el-alert v-if="apiError" :title="apiError" type="error" show-icon :closable="false"/>
 
   </el-form>
 </template>
 
 <script setup>
-import { ref, reactive, watch, computed } from 'vue';
+import {ref, reactive, watch, computed} from 'vue';
 import {
   ElForm,
   ElFormItem,
@@ -64,8 +65,8 @@ const props = defineProps({
     default: false
   },
   apiError: { // 由父组件传入的 API 错误信息
-      type: String,
-      default: ''
+    type: String,
+    default: ''
   }
 });
 
@@ -90,12 +91,12 @@ const isEditing = computed(() => !!props.initialData?.id);
 // --- Rules ---
 const rules = reactive({
   title: [
-    { required: true, message: '章节标题不能为空', trigger: 'blur' },
-    { min: 1, max: 100, message: '长度在 1 到 100 个字符', trigger: 'blur' }
+    {required: true, message: '章节标题不能为空', trigger: 'blur'},
+    {min: 1, max: 100, message: '长度在 1 到 100 个字符', trigger: 'blur'}
   ],
   summary: [
-     // 概要是可选的
-    { max: 5000, message: '概要不能超过 5000 个字符', trigger: 'blur' }
+    // 概要是可选的
+    {max: 5000, message: '概要不能超过 5000 个字符', trigger: 'blur'}
   ]
 });
 
@@ -113,7 +114,7 @@ watch(() => props.initialData, (newData) => {
     // 如果表单实例存在，清除校验状态
     chapterFormRef.value?.resetFields();
   }
-}, { immediate: true, deep: true }); // immediate: 首次加载时执行, deep: 深度监听 initialData
+}, {immediate: true, deep: true}); // immediate: 首次加载时执行, deep: 深度监听 initialData
 
 // --- Methods ---
 const handleSubmit = async () => {
@@ -133,7 +134,7 @@ const handleSubmit = async () => {
         // 注意：根据后端 API，可能还需要包含 order 等字段
         // order: props.initialData.order // 如果需要传递 order
       };
-       emit('save', { id: props.initialData.id, data: payload });
+      emit('save', {id: props.initialData.id, data: payload});
     } else {
       // 创建模式: 发送 ChapterCreate schema 需要的数据
       payload = {
@@ -142,7 +143,7 @@ const handleSubmit = async () => {
         summary: formData.value.summary
         // 注意：后端的 order 可能由服务层自动处理，或需要前端指定一个初始值（如 0 或列表长度）
       };
-       emit('save', { data: payload }); // 不传 ID 表示创建
+      emit('save', {data: payload}); // 不传 ID 表示创建
     }
 
   } catch (validationError) {
@@ -169,7 +170,8 @@ const handleCancel = () => {
 .el-form-item {
   margin-bottom: 20px;
 }
+
 .el-alert {
-    margin-top: 15px;
+  margin-top: 15px;
 }
 </style>

@@ -2,22 +2,22 @@
 import {defineStore} from 'pinia';
 import {sceneAPI} from '@/services/sceneAPI';       // Adjust path
 import {generationAPI} from '@/services/generationAPI'; // Adjust path
-import {useChapterStore} from './chapter'; // To update chapter state when scenes move
+import {useChapterStore} from './chapter';
 
 export const useSceneStore = defineStore('scene', {
     state: () => ({
         activeScene: null,      // Full details of the scene being edited/viewed
-        unassignedScenes: [], // Scenes belonging to the project but not a chapter
+        scenes: [], // Scenes belonging to the project but not a chapter
+        isLoading: false,
         isLoadingDetails: false,
-        isLoadingUnassigned: false,
         isGenerating: false,    // Specific loading state for RAG generation
         error: null,            // Error specific to scene operations
         generationError: null, // Error specific to RAG generation
     }),
     actions: {
         _setLoading(type, value) {
+            if (type === 'fatch') this.isLoading = value;
             if (type === 'details') this.isLoadingDetails = value;
-            if (type === 'unassigned') this.isLoadingUnassigned = value;
             if (type === 'generating') this.isGenerating = value;
         },
         _setError(type, error) {
@@ -25,11 +25,11 @@ export const useSceneStore = defineStore('scene', {
             if (type === 'details') this.error = message;
             if (type === 'generating') this.generationError = message;
         },
-        clearScenes() { // Clears both active and unassigned
+        clearScenes() {
             this.activeScene = null;
-            this.unassignedScenes = [];
+            this.scenes = [];
+            this.isLoading = false;
             this.isLoadingDetails = false;
-            this.isLoadingUnassigned = false;
             this.isGenerating = false;
             this.error = null;
             this.generationError = null;
@@ -38,7 +38,6 @@ export const useSceneStore = defineStore('scene', {
             this.activeScene = null;
             this.isLoadingDetails = false;
             this.error = null;
-            // Don't clear generation error here, might be useful feedback
         },
         async fetchSceneDetails(sceneId) {
             if (!sceneId) {
@@ -65,21 +64,38 @@ export const useSceneStore = defineStore('scene', {
                 this._setLoading('details', false);
             }
         },
-        async fetchUnassignedScenes(projectId) {
+        async fetchScenes(projectId) {
             if (!projectId) {
-                this.unassignedScenes = [];
+                this.scenes = [];
                 return;
             }
-            this._setLoading('unassigned', true);
+            this._setLoading('fatch', true);
             this._setError('details', null); // Use general error for list fetch
             try {
-                const response = await sceneAPI.getUnassignedScenesByProject(projectId);
-                this.unassignedScenes = response.data;
+                const response = await sceneAPI.getScenesByProject(projectId);
+                this.scenes = response.data;
             } catch (err) {
                 this._setError('details', err);
-                this.unassignedScenes = [];
+                this.scenes = [];
             } finally {
-                this._setLoading('unassigned', false);
+                this._setLoading('fatch', false);
+            }
+        },
+        async fetchScenesByChapter(chapterId) {
+            if (!chapterId) {
+                this.scenes = [];
+                return;
+            }
+            this._setLoading('fatch', true);
+            this._setError('details', null); // Use general error for list fetch
+            try {
+                const response = await sceneAPI.getScenesByChapter(chapterId);
+                this.scenes = response.data;
+            } catch (err) {
+                this._setError('details', err);
+                this.scenes = [];
+            } finally {
+                this._setLoading('fatch', false);
             }
         },
         async createScene(sceneData) {
@@ -89,14 +105,9 @@ export const useSceneStore = defineStore('scene', {
                 const response = await sceneAPI.createScene(sceneData);
                 const newScene = response.data;
 
-                // Add to the correct list (unassigned or chapter's list)
                 if (newScene.chapter_id) {
                     const chapterStore = useChapterStore();
                     chapterStore.addSceneToChapter(newScene.chapter_id, newScene);
-                } else {
-                    this.unassignedScenes.push(newScene);
-                    // sort if needed
-                    this.unassignedScenes.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
                 }
                 return newScene;
             } catch (err) {
@@ -108,7 +119,6 @@ export const useSceneStore = defineStore('scene', {
             // Decide which loading state makes sense, maybe details?
             this._setLoading('details', true);
             this._setError('details', null);
-            const previousChapterId = sceneUpdateData.previousChapterId ? sceneUpdateData.previousChapterId : this.activeScene?.chapter_id;
             try {
                 const response = await sceneAPI.updateScene(sceneId, sceneUpdateData);
                 const updatedScene = response.data;
@@ -116,41 +126,6 @@ export const useSceneStore = defineStore('scene', {
                 // Update active scene if it's the one being edited
                 if (this.activeScene?.id === sceneId) {
                     this.activeScene = updatedScene;
-                }
-
-                const chapterStore = useChapterStore();
-                const currentChapterId = updatedScene.chapter_id;
-
-                // Handle changes in assignment
-                if (previousChapterId && !currentChapterId) { // Moved from chapter to unassigned
-                    chapterStore.removeSceneFromChapter(previousChapterId, sceneId);
-                    this.unassignedScenes.push(updatedScene);
-                    this.unassignedScenes.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                } else if (!previousChapterId && currentChapterId) { // Moved from unassigned to chapter
-                    this.unassignedScenes = this.unassignedScenes.filter(s => s.id !== sceneId);
-                    chapterStore.addSceneToChapter(currentChapterId, updatedScene);
-                } else if (previousChapterId && currentChapterId && previousChapterId !== currentChapterId) {
-                    chapterStore.removeSceneFromChapter(previousChapterId, sceneId);
-                    chapterStore.addSceneToChapter(currentChapterId, updatedScene);
-                } else if (currentChapterId) { // Updated within the same chapter
-                    // Find the chapter and update the scene within its list
-                    const chapter = chapterStore.chapters.find(ch => ch.id === currentChapterId);
-                    if (chapter && chapter.scenes) {
-                        const sceneIndex = chapter.scenes.findIndex(s => s.id === sceneId);
-                        if (sceneIndex !== -1) {
-                            chapter.scenes[sceneIndex] = updatedScene;
-                            // Re-sort if order changed
-                            if (sceneUpdateData.order_in_chapter !== undefined) {
-                                chapter.scenes.sort((a, b) => a.order_in_chapter - b.order_in_chapter);
-                            }
-                        }
-                    }
-                } else { // Updated while unassigned
-                    const index = this.unassignedScenes.findIndex(s => s.id === sceneId);
-                    if (index !== -1) {
-                        this.unassignedScenes[index] = updatedScene;
-                        this.unassignedScenes.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                    }
                 }
 
 
@@ -164,19 +139,16 @@ export const useSceneStore = defineStore('scene', {
         },
         async deleteScene(sceneId) {
             this._setError('details', null);
-            const sceneToDelete = this.activeScene?.id === sceneId ? this.activeScene :
-                this.unassignedScenes.find(s => s.id === sceneId) ||
-                useChapterStore().chapters.flatMap(c => c.scenes || []).find(s => s.id === sceneId);
-            const chapterId = sceneToDelete?.chapter_id;
             try {
                 const response = await sceneAPI.deleteScene(sceneId);
+                const sceneToDelete = response.data;
+                const chapterId = sceneToDelete?.chapter_id;
 
-                // Remove from active scene if it's the one deleted
                 if (this.activeScene?.id === sceneId) {
                     this.activeScene = null;
                 }
-                // Remove from unassigned list
-                this.unassignedScenes = this.unassignedScenes.filter(s => s.id !== sceneId);
+                // Remove from scenes list
+                this.scenes = this.scenes.filter(s => s.id !== sceneId);
                 // Remove from chapter list
                 if (chapterId) {
                     const chapterStore = useChapterStore();
@@ -205,7 +177,6 @@ export const useSceneStore = defineStore('scene', {
                     this.activeScene = updatedScene;
                 }
 
-                // Also update the scene in its respective list (chapter or unassigned)
                 const chapterStore = useChapterStore();
                 if (updatedScene.chapter_id) {
                     const chapter = chapterStore.chapters.find(ch => ch.id === updatedScene.chapter_id);
@@ -215,13 +186,7 @@ export const useSceneStore = defineStore('scene', {
                             chapter.scenes[sceneIndex] = updatedScene; // Update scene in chapter list
                         }
                     }
-                } else {
-                    const index = this.unassignedScenes.findIndex(s => s.id === sceneId);
-                    if (index !== -1) {
-                        this.unassignedScenes[index] = updatedScene; // Update scene in unassigned list
-                    }
                 }
-
                 return updatedScene;
             } catch (err) {
                 this._setError('generating', err);

@@ -9,11 +9,18 @@
     <el-form-item label="项目标题" prop="title">
       <el-input v-model="formData.title" placeholder="例如：赛博朋克侦探故事" />
     </el-form-item>
+    <el-form-item label="风格" prop="style">
+      <el-input
+        v-model="formData.style"
+        :rows="2"
+        placeholder="小说风格：玄幻、赛博朋克、科幻、未来主义等"
+      />
+    </el-form-item>
     <el-form-item label="一句话简介 (Logline)" prop="logline">
       <el-input
         v-model="formData.logline"
         type="textarea"
-        :rows="2"
+        :rows="5"
         placeholder="用一句话概括你的故事核心"
       />
     </el-form-item>
@@ -63,6 +70,7 @@ const isEditMode = computed(() => !!props.projectToEdit);
 // Initialize form data
 const initialFormData = () => ({
   title: '',
+  style: '',
   logline: '',
   global_synopsis: '',
 });
@@ -75,6 +83,10 @@ const rules = reactive({
     { required: true, message: '项目标题不能为空', trigger: 'blur' },
     { min: 2, max: 100, message: '标题长度应在 2 到 100 个字符之间', trigger: 'blur' },
   ],
+  style: [
+    { required: true, message: '风格不能为空', trigger: 'blur' },
+    { min: 2, max: 20, message: '风格长度应在 2 到 20 个字符之间', trigger: 'blur' },
+  ],
   // Add more rules if needed for logline or synopsis
 });
 
@@ -85,6 +97,7 @@ watch(
     if (newVal) {
       // Edit mode: Populate form with existing data
       formData.title = newVal.title || '';
+      formData.style = newVal.style || '';
       formData.logline = newVal.logline || '';
       formData.global_synopsis = newVal.global_synopsis || '';
       // Reset validation state if needed when switching projects

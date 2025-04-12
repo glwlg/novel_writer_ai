@@ -1,4 +1,6 @@
 # 在你的 RAG 服务函数内部
+import json
+
 from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,8 +12,9 @@ from typing import List, Dict, Any, Optional
 
 from app.models.structure import SceneStatus
 from app.schemas import SceneUpdate, ChapterUpdate
-from app.schemas.scene import SceneUpdateGenerated
+from app.schemas.scene import SceneUpdateGenerated, SceneCreate
 from app.services import llm_service, scene_service, chapter_service
+from app.utils import jsonUtils
 
 
 # --- 检索函数 ---
@@ -329,8 +332,172 @@ def format_context_for_prompt(
     return f"<相关上下文>\n{final_context.strip()}\n</相关上下文>"
 
 
-# --- Core RAG Service Function ---
-async def generate_scene_content_rag(
+async def generate_scenes(
+        db: Session,
+        chapter_id: int
+) -> Chapter:
+    system_prompt = """
+# 提示词：生成小说章节场景列表 (JSON格式)
+你是一位经验丰富的小说编辑和创意助手。你的任务是根据提供的<小说概要>、<相关背景>和<章节信息>，为一个特定的小说章节构思并生成一系列场景（大约3-4个）。
+请将结果以严格的JSON格式返回，该JSON是一个包含多个场景对象的数组，每个对象包含“title”和“goal”两个键。
+
+**任务要求:**
+
+1.  **分析输入信息：** 仔细阅读小说概要、相关背景和章节信息，理解本章节在整个故事结构中的功能和需要达成的叙事目的。
+2.  **构思场景：** 将章节内容合理地分解为 **3到4个** 逻辑连贯或有递进关系的场景。每个场景应聚焦于一个具体的事件、对话、行动或情绪/信息节点。
+3.  **定义场景目标：** 为每个场景明确其核心目的或需要展现的核心内容。这应该简洁地说明该场景要达成什么效果，例如：
+    *   引入新角色或关键信息
+    *   展现人物的内心挣扎或决策过程
+    *   推动情节发展，制造转折点
+    *   加剧或缓和某个冲突
+    *   建立或破坏人物关系
+    *   营造特定的氛围或悬念
+    *   为后续情节埋下伏笔
+4.  **生成JSON输出：** 严格按照以下JSON格式组织结果。确保输出是纯粹的JSON代码块，不包含任何额外的解释性文字或代码块标记符之外的内容。
+
+```json
+[
+  {
+    "title": "（为第一个场景取的简洁标题）",
+    "goal": "（描述第一个场景的核心目标/主要内容/要达成的效果）"
+  },
+  {
+    "title": "（为第二个场景取的简洁标题）",
+    "goal": "（描述第二个场景的核心目标/主要内容/要达成的效果）"
+  },
+  {
+    "title": "（为第三个场景取的简洁标题）",
+    "goal": "（描述第三个场景的核心目标/主要内容/要达成的效果）"
+  }
+  // 如果有第四个场景，请继续添加
+  // {
+  //   "title": "（为第四个场景取的简洁标题）",
+  //   "goal": "（描述第四个场景的核心目标/主要内容/要达成的效果）"
+  // }
+]
+```
+
+**请严格遵守：**
+
+*   场景的目标不能超过<章节信息>中的内容；<相关背景>是作为信息参考方便你理解<章节信息>中的内容。
+*   输出**必须**是格式完全正确的JSON数组，直接可供Python等程序解析。
+*   JSON中只包含指定的`title`和`goal`两个字段。
+*   场景数量控制在3或4个。
+*   场景目标描述应精炼、准确，点明核心。
+*   场景的划分和目标设定应紧密围绕<章节信息>所指示的主题或事件。
+```
+            """
+
+    # 1. Fetch the Scene
+    chapter = chapter_service.get_chapter(db, chapter_id=chapter_id)
+
+    if not chapter:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Chapter with id {chapter_id} not found.")
+    if not chapter.project_id:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Chapter {chapter_id} is missing project association.")
+
+    try:
+        # 2. Get Query Embedding (Generate fresh embedding for the current goal)
+        print("Generating embedding for chapter title...")
+        query_embedding = await llm_service.get_embedding(chapter.title)
+
+        # 3. Retrieve Relevant Context
+        print("Retrieving relevant context...")
+        # 如果不是第一个章节，需要获取上一个章节的上下文
+        current_chapter_id = None
+        if chapter.order != 0:
+            current_chapter_id = chapter_id
+        retrieved_context = await retrieve_relevant_context(db, chapter.project_id, query_embedding, 10,
+                                                            current_chapter_id=current_chapter_id)
+        # print(f"Retrieved Context: {retrieved_context}") # DEBUG
+
+        # 4. Format Context
+        context_string = format_context_for_prompt(retrieved_context, max_context_length=20000)
+        print("Formatted Context String (truncated):")
+        print(context_string[:500] + "..." if len(context_string) > 500 else context_string)
+
+        chapter_info = f"第 {chapter.order + 1} 章: {chapter.title}"
+
+        # 5. Build Prompt
+        # Prompt Engineering is key here! This is a basic example.
+        prompt = f"""
+<小说概要>
+标题：{chapter.project.title}
+风格：{chapter.project.style}
+概要：
+{chapter.project.logline}
+</小说概要>
+<章节信息>
+第 {chapter.order + 1} 章: {chapter.title}
+章节概要：
+{chapter.summary}
+</章节信息>
+<相关背景>
+{context_string}
+</相关背景>
+"""
+        print("\n--- Generated Prompt (truncated) ---")  # DEBUG
+        print(prompt)  # DEBUG
+        print("--- End of Prompt ---\n")  # DEBUG
+
+        # 6. Call LLM to Generate Content
+        print("Calling LLM for scene content generation...")
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        generated_text = await llm_service.generate_text(messages, max_tokens=48000)
+        print("LLM generation complete.")
+        print("\n--- Generated Content (truncated) ---")  # DEBUG
+        print(generated_text[:500] + "..." if len(generated_text) > 500 else generated_text)  # DEBUG
+        print("--- End of Generated Content ---\n")  # DEBUG
+
+        try:
+            json_string_to_parse = jsonUtils.extract_json_from_response(generated_text)
+            print("--- 提取出的待解析字符串 ---")
+            print(json_string_to_parse)
+            print("---------------------------\n")
+            scene_list = json.loads(json_string_to_parse)
+            for i, scene in enumerate(scene_list):
+                print(f"--- 场景 {i + 1} ---")
+                print(f"标题: {scene.get('title')}")
+                print(f"目标: {scene.get('goal')}")
+                scene_create = SceneCreate(
+                    project_id=chapter.project_id,
+                    chapter_id=chapter_id,
+                    title=scene.get('title'),
+                    goal=scene.get('goal'),
+                    status=SceneStatus.PLANNED,
+                    order_in_chapter=i
+                )
+                await scene_service.create_scene(db, scene=scene_create)
+
+        except json.JSONDecodeError as e:
+            print(f"JSON解析错误: {e}")
+            print(f"原始响应: {generated_text}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to parse LLM response as JSON: {e}"
+            )
+
+
+        print(f"Successfully generated scenes for : {chapter.title}")
+        return chapter
+
+    except HTTPException as http_exc:
+        raise http_exc  # Re-raise HTTP exceptions from LLM service or validation
+    except Exception as e:
+        print(f"Error during generation scenes for chapter {chapter_id}: {e}")
+        import traceback
+        traceback.print_exc()  # Log the full traceback for debugging
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred during generation scenes : {e}"
+        )
+
+
+async def generate_scene_content(
         db: Session,
         scene_id: int
 ) -> Scene:
@@ -344,11 +511,11 @@ async def generate_scene_content_rag(
     6. Updates scene with generated content, status, and optional summary/embedding.
     """
     system_prompt = """
-你是一名AI小说写作助手。你的任务是根据下面给出的“场景目标”和“相关背景”，撰写相应的场景内容。
+你是一名AI小说写作助手。你的任务是根据下面给出的<小说概要>、<相关背景>和<场景目标>，撰写相应的场景内容。
 请注意：
-创作时必须完全基于所提供的“场景目标”和“相关背景”。
-写作的中心是实现“场景目标”。
-请运用“相关背景”来设计人物的行为、对话、场景细节以及他们之间的关系。（重要：如果这是章节中的后续场景，请确保“相关背景”包含了前一场景结尾时的关键信息，如人物情绪、位置、遗留问题等。）
+创作时必须完全基于所提供的<小说概要>、<相关背景>和<场景目标>。
+写作的中心是实现<场景目标>。
+请运用<相关背景>来设计人物的行为、对话、场景细节以及他们之间的关系。
 保持连贯性： 确保本场景的开端与“相关背景”中提供的前续场景信息（人物状态、情节进展、环境等）自然衔接，避免逻辑冲突或状态突变。
 除非“目标”或“背景”中已有暗示，否则不要自行添加新的主要角色或重要故事情节。
 请用清晰、有吸引力的叙事风格来写。
@@ -412,9 +579,10 @@ async def generate_scene_content_rag(
         # Prompt Engineering is key here! This is a basic example.
         prompt = f"""
 <小说概要>
-{scene.project.title}
-
-{scene.project.logline}
+标题：{scene.chapter.volume.project.title}
+风格：{scene.chapter.volume.project.style}
+概要：
+{scene.chapter.volume.project.logline}
 </小说概要>
 <相关背景>
 {context_string}
@@ -490,22 +658,41 @@ async def generate_chapter_content(
 ) -> Chapter:
 
     system_prompt = """
-# 小说章节整合与深度扩写任务
-请将下方提供的几个文本片段，按照它们提供的顺序，整合并深度扩写成一个**连贯流畅、内容丰富**的单一章节。
+**小说章节创作指令：整合、深化与扩写**
 
-**目标：**
+**核心任务：** 请将下方按顺序提供的多个文本片段，**无缝整合**并进行**深度扩写**，创作出一个**逻辑连贯、情节饱满、细节丰富、引人入胜**的单一小说章节。
 
-1.  **整合与衔接：** 将所有提供的片段无缝融合，确保情节、时间、逻辑和人物状态的**自然过渡与连贯性**。补充必要的过渡性描写和心理活动，使得原本分离的片段读起来像一个有机的整体。
-2.  **深度扩写：** 在**严格保持原有核心剧情事件和发展顺序不变**的前提下，对内容进行大幅度扩充，目标字数达到 **[8000字左右]**。扩写的重点在于：
-    *   **丰富细节：** 增加环境描写的层次感、感官细节（视觉、听觉、嗅觉、触觉等）、动作描写的具体过程。
-    *   **深化人物：** 深入挖掘角色的内心世界，补充其在各个场景下的心理活动、情绪变化、思考、回忆闪现、动机挣扎等。
-    *   **强化氛围：** 根据不同片段的基调，着力渲染所需的情绪氛围（例如：紧张、悬疑、悲伤、激昂、宁静、压抑等）。
-    *   **增强张力：** 对于冲突、关键转折或高潮部分，适当放慢节奏，增加铺垫和细节描写，提升戏剧张力。
-3.  **避免冗余：** 扩写应追求**有意义的丰富**，而非简单的词语堆砌或情节重复。确保新增内容服务于情节推进、人物塑造或氛围营造。避免空洞的形容词滥用和无意义的拉长句子。
-4.  **保持核心剧情：** **绝对不允许**修改原有片段中的关键情节、事件结果、核心设定或人物关系。扩写是在原有骨架上填充血肉，而不是改变骨架。
-5.  **文风要求：** 整体文风需**引人入胜，富有表现力**。请根据各片段内容，自然调整叙事节奏和语言风格，力求让读者获得沉浸式的阅读体验（即“读得爽”）
-6.  **输出格式：** **请严格仅输出最终整合扩写后的小说章节正文。** 不要包含任何关于你执行了哪些操作的说明、对提示词的分析、诸如【扩写部分】之类的标记，或任何非小说正文的内容。
-            """
+**具体要求：**
+
+1.  **整合与流畅性 (Integration & Flow):**
+    *   **无缝衔接：** 必须将所有片段自然地融合成一个有机的整体。运用必要的过渡性描写（场景转换、时间流逝暗示等）和内心活动（承上启下的思考、情绪转变等），确保片段间的逻辑链条清晰、转换顺滑，没有任何生硬的跳跃感。
+    *   **叙事连贯：** 保持统一的叙事视角（除非片段本身包含视角转换且需要保留）。确保人物状态、情绪发展和情节推进具有内在的一致性和逻辑性。
+
+2.  **深度扩写与丰富化 (Expansion & Enrichment):**
+    *   **目标篇幅：** 在保持核心内容不变的前提下，将总字数扩充至 **[8000字]** 左右。扩写需**有意义、有价值**，而非简单重复或填充。
+    *   **感官沉浸 (Sensory Immersion):** 大幅增加**具体、生动**的感官细节。不仅限于视觉，要充分调动听觉、嗅觉、触觉、味觉（若适用）的描写，让读者仿佛身临其境。
+    *   **环境互动 (Environmental Interaction):** 细化环境描写，不仅仅是静态呈现，更要描写角色与环境的互动，环境如何影响角色的情绪、决策和行动。
+    *   **人物内心深掘 (Character Depth):** 极大地丰富角色的内心世界。详细描绘其**即时**的心理活动、情绪波动（从细微到剧烈）、内在冲突、动机分析、价值判断、即时回忆闪现（与当前情境相关的）、潜意识的想法等。让人物行为有充分的心理依据支撑。
+    *   **行动过程细化 (Action Detailing):** 将关键动作、行为或过程进行分解，描写具体的步骤、姿态、力度、微表情等，增强画面感和真实感。
+    *   **对话与潜台词 (Dialogue & Subtext):** 如果片段包含对话，可适当扩充对话内容，使其更自然、更符合人物性格，并可能包含未言明的潜台词或暗示。补充对话间的神态、动作和心理反应。
+    *   **氛围营造 (Atmosphere Building):** 根据情节需要，运用恰当的语言风格、节奏控制、环境烘托和心理描写，**精准地**营造和强化所需的情绪氛围（如紧张、悬疑、温馨、悲怆、压抑、神秘等）。
+    *   **张力构建 (Tension & Pacing):** 在冲突点、关键转折或高潮部分，**有意识地控制叙事节奏**。可通过增加细节、放慢动作描写、强化心理博弈、运用悬念等手法，逐步积累并释放戏剧张力。
+
+3.  **核心剧情的绝对忠诚 (Plot Fidelity):**
+    *   **严守核心：** **绝对禁止**修改或偏离原始片段提供的**核心情节事件、关键设定、人物关系、事件的起因和结果**。扩写是在此基础上丰富血肉，绝非改动骨架。
+    *   **避免画蛇添足：** 新增内容必须服务于原有情节、人物或氛围，不得引入与核心剧情无关或可能导致逻辑矛盾的新元素。
+
+4.  **文风与表达 (Style & Expression):**
+    *   **生动有力：** 追求**精准、生动、富有表现力**的语言。避免过度使用空洞的形容词和副词，力求用具体的描写展现效果。
+    *   **叙事节奏：** 根据内容需要，灵活调整叙事节奏，快慢结合，张弛有度。
+    *   **沉浸体验：** 最终目标是创作出能让读者**深度沉浸、情感共鸣、阅读体验流畅愉悦** (“读得爽”) 的章节。
+
+5.  **输出要求 (Output Format):**
+    *   **纯净正文：** **请严格只输出最终整合扩写后的小说章节正文。**
+    *   **无附加信息：** 不要包含任何解释性文字、操作说明、分析、标记（如【扩写部分】）或任何非小说正文的内容。
+    *   **纯文本格式：** 不要包含任何markdown语法标记。
+    *   **语言：** 不要出现任何英文内容。
+         """
 
 
     # 1. Fetch the Chapter

@@ -31,6 +31,8 @@ async def create_chapter(db: Session, chapter: ChapterCreate) -> Chapter:
             raise ValueError(f"Chapter with title '{chapter.title}' already exists in this project.")
         elif "projects_fk" in str(e.orig):
             raise ValueError(f"Project with id {chapter.project_id} does not exist.")
+        elif "volumes_fk" in str(e.orig):
+            raise ValueError(f"Project with id {chapter.volume_id} does not exist.")
         else:
             raise ValueError("Failed to create chapter due to a database constraint.")
 
@@ -47,6 +49,14 @@ def get_chapters_by_project(db: Session, project_id: int, skip: int = 0, limit: 
     return db.query(Chapter).options(
         selectinload(Chapter.scenes)  # 预加载场景列表
     ).filter(Chapter.project_id == project_id).order_by(
+        asc(Chapter.order)  # 按 order 字段升序排序
+    ).offset(skip).limit(limit).all()
+
+def get_chapters_by_volume(db: Session, volume_id: int, skip: int = 0, limit: int = 100) -> List[Chapter]:
+    """获取指定项目下的章节列表，按 'order' 排序，并预加载场景"""
+    return db.query(Chapter).options(
+        selectinload(Chapter.scenes)  # 预加载场景列表
+    ).filter(Chapter.volume_id == volume_id).order_by(
         asc(Chapter.order)  # 按 order 字段升序排序
     ).offset(skip).limit(limit).all()
 

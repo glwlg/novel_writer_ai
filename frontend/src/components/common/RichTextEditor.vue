@@ -1,169 +1,178 @@
 <template>
-  <div class="rich-text-editor" :class="{ 'is-disabled': disabled }">
-    <div v-if="editor && showToolbar" class="editor-toolbar">
-      <el-button-group>
-        <el-button @click="editor.chain().focus().toggleBold().run()"
-                   :type="editor.isActive('bold') ? 'primary' : 'default'" text bg size="small" :disabled="disabled">
-          <el-icon>
-            <Bowl/>
-          </el-icon>
-        </el-button>
-        <el-button @click="editor.chain().focus().toggleItalic().run()"
-                   :type="editor.isActive('italic') ? 'primary' : 'default'" text bg size="small" :disabled="disabled">
-          <el-icon>
-            <Bottom/>
-          </el-icon>
-        </el-button>
-        <el-button @click="editor.chain().focus().toggleStrike().run()"
-                   :type="editor.isActive('strike') ? 'primary' : 'default'" text bg size="small" :disabled="disabled">
-          <el-icon>
-            <DCaret/>
-          </el-icon> <!-- Placeholder icon -->
-        </el-button>
-        <el-button @click="editor.chain().focus().setParagraph().run()"
-                   :type="editor.isActive('paragraph') ? 'primary' : 'default'" text bg size="small"
-                   :disabled="disabled">
-          P
-        </el-button>
-        <el-button @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"
-                   :type="editor.isActive('heading', { level: 3 }) ? 'primary' : 'default'" text bg size="small"
-                   :disabled="disabled">
-          H3
-        </el-button>
-        <el-button @click="editor.chain().focus().toggleBulletList().run()"
-                   :type="editor.isActive('bulletList') ? 'primary' : 'default'" text bg size="small"
-                   :disabled="disabled">
-          <el-icon>
-            <List/>
-          </el-icon>
-        </el-button>
-        <el-button @click="editor.chain().focus().toggleOrderedList().run()"
-                   :type="editor.isActive('orderedList') ? 'primary' : 'default'" text bg size="small"
-                   :disabled="disabled">
-          <!-- Placeholder Icon for Ordered List --> Ol
-        </el-button>
-        <!-- Add more buttons as needed: undo, redo, blockquote, codeblock etc. -->
+  <div class="novel-editor" :class="{ 'is-disabled': disabled }">
+    <!-- Minimal Toolbar -->
+    <div v-if="editor && showToolbar" class="editor-toolbar-minimal">
+      <el-tooltip effect="dark" content="撤销 (Ctrl+Z)" placement="top">
         <el-button @click="editor.chain().focus().undo().run()" text bg size="small"
-                   :disabled="!editor.can().undo() || disabled">
-          <el-icon>
-            <RefreshLeft/>
-          </el-icon>
+                   :disabled="!editor.can().undo() || disabled" aria-label="撤销">
+          <el-icon><RefreshLeft /></el-icon>
         </el-button>
+      </el-tooltip>
+      <el-tooltip effect="dark" content="重做 (Ctrl+Y)" placement="top">
         <el-button @click="editor.chain().focus().redo().run()" text bg size="small"
-                   :disabled="!editor.can().redo() || disabled">
-          <el-icon>
-            <RefreshRight/>
-          </el-icon>
+                   :disabled="!editor.can().redo() || disabled" aria-label="重做">
+          <el-icon><RefreshRight /></el-icon>
         </el-button>
-
-      </el-button-group>
+      </el-tooltip>
+      <!-- Optional Italic button -->
+      <!--
+      <el-tooltip effect="dark" content="斜体 (Ctrl+I)" placement="top">
+         ...
+      </el-tooltip>
+      -->
+      <!-- Character Count -->
+      <span class="word-count" v-if="showWordCount && editor">
+        字数: {{ characterCount }}
+      </span>
     </div>
-    <editor-content :editor="editor" class="editor-content-area"/>
+
+    <!-- Editor Content Area -->
+    <editor-content :editor="editor" class="editor-content-area-novel"/>
   </div>
 </template>
 
 <script setup>
-import {ref, watch, onMounted, onBeforeUnmount, defineProps, defineEmits} from 'vue';
-import {Editor, EditorContent} from '@tiptap/vue-3';
-import StarterKit from '@tiptap/starter-kit';
-// Optional: Add more extensions like Placeholder, Link, Image etc.
-// import Placeholder from '@tiptap/extension-placeholder'
+import { ref, watch, onMounted, onBeforeUnmount, defineProps, defineEmits, computed } from 'vue';
+import { Editor, EditorContent } from '@tiptap/vue-3';
+// --- Core Tiptap Extensions ---
+import Document from '@tiptap/extension-document';
+import Paragraph from '@tiptap/extension-paragraph';
+import Text from '@tiptap/extension-text';
+import History from '@tiptap/extension-history'; // Undo/Redo
+import Placeholder from '@tiptap/extension-placeholder'; // Placeholder text
+import CharacterCount from '@tiptap/extension-character-count'; // Word/Character count
+// Optional: Italic for emphasis
+// import Italic from '@tiptap/extension-italic';
 
-import {ElButtonGroup, ElButton, ElIcon} from 'element-plus';
-// Import specific icons used in the toolbar
-import {Bowl, Bottom, DCaret, List, RefreshLeft, RefreshRight} from '@element-plus/icons-vue';
+// --- UI Components ---
+import { ElButton, ElIcon, ElTooltip } from 'element-plus';
+import { RefreshLeft, RefreshRight } from '@element-plus/icons-vue';
 
-
-// Props definition
+// --- Props Definition ---
 const props = defineProps({
-  modelValue: {
-    type: String,
-    default: '',
-  },
-  placeholder: {
-    type: String,
-    default: '开始输入...'
-  },
-  showToolbar: {
-    type: Boolean,
-    default: true,
-  },
-  disabled: { // To disable editing
-    type: Boolean,
-    default: false
-  }
+  modelValue: { type: String, default: '' },
+  placeholder: { type: String, default: '从这里开始你的故事...' },
+  showToolbar: { type: Boolean, default: true },
+  disabled: { type: Boolean, default: false },
+  showWordCount: { type: Boolean, default: true },
+  // limit: { type: Number, default: null }, // Optional limit for CharacterCount
 });
 
-// Emits definition
+// --- Emits Definition ---
 const emit = defineEmits(['update:modelValue', 'blur', 'focus']);
 
 // --- Refs ---
 const editor = ref(null);
 
-const formatText = (text) => {
-  if (!text) {
-    return '';
-  }
-  // 使用正则表达式全局替换 \n 为 <br>
-  // 注意：要确保 HardBreak 扩展已启用，否则 <br> 可能被过滤掉
-  return text.replace(/\n/g, '<br>');
+// --- Helper Function: Plain Text with Newlines to HTML Paragraphs ---
+// Converts a string containing newline characters (\n) into an HTML
+// string where each line becomes a paragraph (<p>).
+const plainTextToHtmlParagraphs = (text) => {
+  if (text === null || text === undefined) return '<p></p>'; // Handle null/undefined
+  // Ensure text is a string before splitting
+  const textString = String(text);
+  // If the input string is empty, return a single empty paragraph for Tiptap.
+  if (textString.trim() === '') return '<p></p>';
+  return textString
+      .replace(/\n\n/g, '\n') // Normalize line endings
+    .split('\n')
+    // Wrap each line in <p> tags. Even empty lines become <p></p>.
+    .map(line => `<p>${line}</p>`)
+    .join('');
 };
 
-// --- Methods ---
-const setupEditor = () => {
-  editor.value = new Editor({
-    content: formatText(props.modelValue),
-    editable: !props.disabled,
-    extensions: [
-      StarterKit.configure({
-        // Configure StarterKit options if needed
-        // heading: { levels: [1, 2, 3], }, // Example
-        // paragraph: {},
-      }),
-      // Placeholder.configure({
-      //    placeholder: props.placeholder,
-      // })
-    ],
-    onUpdate: () => {
-      // HTML content
-      // emit('update:modelValue', editor.value.getHTML());
-      // JSON content (more structured, potentially better for storage)
-      // emit('update:modelValue', editor.value.getJSON());
+// --- Computed Properties ---
+const characterCount = computed(() => {
+  // Use .characters() method for counting characters (字数)
+  return editor.value?.storage.characterCount.characters() || 0;
+});
 
-      // Emit HTML for simplicity with v-model expecting string
-      // emit('update:modelValue', editor.value.getHTML());
-      emit('update:modelValue', editor.value.getText());
+// --- Editor Setup ---
+const setupEditor = () => {
+  const extensions = [
+    Document,
+    Paragraph, // Essential for paragraphs
+    Text,      // Essential for text nodes
+    History.configure({ depth: 50 }), // Configure undo history size
+    Placeholder.configure({
+       placeholder: props.placeholder,
+       emptyEditorClass: 'is-editor-empty', // Class for styling the placeholder
+    }),
+    // Add Italic if needed
+    // Italic,
+  ];
+
+  // Add CharacterCount extension if enabled
+  if (props.showWordCount) {
+      extensions.push(CharacterCount.configure({
+          // limit: props.limit,
+          mode: 'character', // Set mode to 'character' for 字数
+      }));
+  }
+
+  // Convert the initial plain text modelValue to HTML paragraphs
+  const initialContent = plainTextToHtmlParagraphs(props.modelValue);
+
+  editor.value = new Editor({
+    content: initialContent, // Initialize Tiptap with the converted HTML
+    editable: !props.disabled,
+    extensions: extensions,
+    editorProps: {
+        attributes: {
+            // Improve accessibility
+            role: 'textbox',
+            'aria-multiline': 'true',
+            // You might add spellcheck="false" if you handle it elsewhere
+            // spellcheck: "false",
+        },
     },
-    onFocus: ({event}) => {
-      emit('focus', event);
+    // --- Event Handlers ---
+    onUpdate: () => {
+      // When the editor content changes, get the text content.
+      // Use blockSeparator: '\n' to ensure paragraphs are separated by a newline.
+      const outputText = editor.value.getText({ blockSeparator: '\n' });
+
+      // Only emit update if the text content has actually changed
+      // compared to the current modelValue to prevent infinite loops.
+      if (outputText !== props.modelValue) {
+           emit('update:modelValue', outputText);
+      }
     },
-    onBlur: ({event}) => {
-      emit('blur', event);
-    },
+    onFocus: ({ event }) => emit('focus', event),
+    onBlur: ({ event }) => emit('blur', event),
   });
-}
+};
 
 // --- Watchers ---
 // Watch for external changes to modelValue
 watch(() => props.modelValue, (newValue) => {
-  // Check if the editor content is already the same to avoid unnecessary updates and cursor jumps
-  const isSame = editor.value && (editor.value.getHTML() === newValue);
-  if (isSame) {
-    return;
-  }
   if (editor.value) {
-    // Use setContent to update the editor content
-    editor.value.commands.setContent(newValue || '', false); // false prevents emitting update event
+    // Get the current editor content as plain text for comparison
+    const currentEditorText = editor.value.getText({ blockSeparator: '\n' });
+
+    // If the external value (newValue) is the same as the editor's current text,
+    // do nothing to avoid unnecessary updates and cursor jumps.
+    if (newValue === currentEditorText) {
+      return;
+    }
+
+    // If the external value differs, convert it to HTML paragraphs
+    const newHtmlValue = plainTextToHtmlParagraphs(newValue || '');
+
+    // Use Tiptap's setContent command to update the editor.
+    // The second argument 'false' prevents this action from triggering the 'onUpdate' handler again.
+    // Use dangerouslyUpdateHTMLString for potentially better performance if needed, but setContent is safer.
+    editor.value.commands.setContent(newHtmlValue, false);
+
+    // Note: It's important that plainTextToHtmlParagraphs and getText({ blockSeparator: '\n' })
+    // are consistent in how they handle the conversion between plain text and Tiptap's internal structure.
   }
 });
 
 // Watch for changes in the disabled state
 watch(() => props.disabled, (isDisabled) => {
-  if (editor.value) {
-    editor.value.setEditable(!isDisabled);
-  }
+  editor.value?.setEditable(!isDisabled);
 });
-
 
 // --- Lifecycle Hooks ---
 onMounted(() => {
@@ -171,134 +180,113 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  if (editor.value) {
-    editor.value.destroy();
-  }
+  editor.value?.destroy();
 });
 
 </script>
 
-<style>
-/* Basic Tiptap styling (you might want to scope or customize further) */
-.rich-text-editor {
+<style scoped>
+.novel-editor {
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
-  background-color: #fff;
+  background-color: var(--el-input-bg-color, #fff);
   display: flex;
   flex-direction: column;
   transition: border-color 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
+  overflow: hidden; 
 }
 
-.rich-text-editor.is-disabled {
+.novel-editor.is-disabled {
   background-color: var(--el-disabled-bg-color);
   border-color: var(--el-disabled-border-color);
   cursor: not-allowed;
 }
 
-.rich-text-editor.is-disabled .ProseMirror {
+.novel-editor.is-disabled .editor-content-area-novel,
+.novel-editor.is-disabled .ProseMirror {
   cursor: not-allowed;
+  color: var(--el-text-color-disabled);
+  -webkit-text-fill-color: var(--el-text-color-disabled); 
 }
 
-.rich-text-editor:focus-within {
+.novel-editor:focus-within {
   border-color: var(--el-color-primary);
 }
 
 
-.editor-toolbar {
-  padding: 5px 8px;
+.editor-toolbar-minimal {
+  padding: 4px 8px;
   border-bottom: 1px solid var(--el-border-color-light);
-  flex-shrink: 0; /* Prevent toolbar from shrinking */
-  background-color: #f9f9f9; /* Slight background for toolbar */
-  border-top-left-radius: 3px; /* Match outer radius */
-  border-top-right-radius: 3px;
-}
-
-.editor-toolbar .el-button-group {
+  flex-shrink: 0;
+  background-color: var(--el-bg-color-page, #f9f9f9);
   display: flex;
-  flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
-  gap: 2px;
+  align-items: center;
+  gap: 6px; 
 }
 
-.editor-toolbar .el-button {
-  /* padding: 4px 8px; */ /* Adjust button padding */
+.word-count {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    margin-left: auto; 
+    padding: 0 5px;
+    white-space: nowrap; 
+    user-select: none; 
 }
 
-.editor-content-area {
-  padding: 10px 12px;
-  flex-grow: 1; /* Allow content area to grow */
-  overflow-y: auto; /* Add scroll if content exceeds height */
-  min-height: 100px; /* Minimum editing area height */
-  max-height: 400px; /* Maximum height before scrolling */
+
+.editor-content-area-novel {
+  flex-grow: 1; 
+  padding: 20px 25px; 
+  overflow-y: auto; 
+  height: 400px; 
+  
+   min-height: 200px;
+  max-height: 60vh;
 }
 
-/* Tiptap's default editor styles */
-.ProseMirror {
-  outline: none; /* Remove default focus outline */
-  line-height: 1.6;
-  word-wrap: break-word;
-  white-space: pre-wrap;
-  /* Add more base styles for paragraphs, headings, lists etc. */
+
+.editor-content-area-novel > .ProseMirror {
+  outline: none; 
+  
+  font-family: 'Source Serif 4', 'Songti SC', 'SimSun', serif;
+  font-size: 16px; 
+  line-height: 1.8; 
+  color: var(--el-text-color-primary);
+  white-space: pre-wrap; 
+  word-wrap: break-word; 
+  max-width: 800px;
+  margin: 0 auto; 
 }
 
-.ProseMirror p {
-  margin-bottom: 0.8em;
+
+.editor-content-area-novel :deep(.ProseMirror p) {
+  min-height: 1.2em; 
+  margin-bottom: 1.2em; 
+  
+  
+  
+  text-indent: 0;
 }
 
-.ProseMirror p:last-child {
+.editor-content-area-novel :deep(.ProseMirror p:last-child) {
   margin-bottom: 0;
 }
 
-.ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror h4, .ProseMirror h5, .ProseMirror h6 {
-  line-height: 1.2;
-  margin-bottom: 0.5em;
-  margin-top: 1em;
-  font-weight: 600;
-}
 
-.ProseMirror h3 {
-  font-size: 1.15em;
-}
-
-.ProseMirror ul, .ProseMirror ol {
-  padding-left: 1.5em;
-  margin-bottom: 0.8em;
-}
-
-.ProseMirror blockquote {
-  border-left: 3px solid var(--el-border-color);
-  margin-left: 0;
-  margin-right: 0;
-  padding-left: 1em;
-  color: var(--el-text-color-secondary);
-}
-
-.ProseMirror pre {
-  background: #0D0D0D;
-  color: #FFF;
-  font-family: 'JetBrainsMono', monospace;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  margin-bottom: 0.8em;
-}
-
-.ProseMirror code {
-  background-color: rgba(97, 97, 97, 0.1);
-  border-radius: 0.25em;
-  box-decoration-break: clone;
-  color: #616161;
-  font-size: 0.9rem;
-  padding: 0.2em 0.4em;
-}
-
-/* --- Placeholder styling (if using Placeholder extension) --- */
-/*
-.ProseMirror p.is-editor-empty:first-child::before {
-  color: #adb5bd;
+.editor-content-area-novel :deep(.ProseMirror p.is-editor-empty:first-child::before) {
   content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
+  float: left; 
+  color: var(--el-text-color-placeholder);
+  pointer-events: none; 
+  height: 0; 
+  font-style: italic;
+  
+  text-indent: 0;
 }
-*/
 
+
+.editor-content-area-novel::-webkit-scrollbar { width: 6px; }
+.editor-content-area-novel::-webkit-scrollbar-track { background: transparent; }
+.editor-content-area-novel::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+.editor-content-area-novel::-webkit-scrollbar-thumb:hover { background: #aaa; }
 </style>

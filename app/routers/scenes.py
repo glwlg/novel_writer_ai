@@ -52,6 +52,24 @@ async def read_chapter_scenes(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
+@router.get("/projects/{project_id}/scenes", response_model=List[SceneReadMinimal])
+async def read_project_scenes(
+        project_id: int,
+        skip: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=200),
+        db: Session = Depends(get_db)
+):
+    """
+    Retrieve scenes belonging to a project.
+    """
+    try:
+        scenes = scene_service.get_scenes_by_project(db=db, project_id=project_id, skip=skip,
+                                                     limit=limit)
+        return scenes
+    except ValueError as e:  # Project not found
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
 @router.get("/projects/{project_id}/scenes/unassigned", response_model=List[SceneReadMinimal])
 async def read_unassigned_project_scenes(
         project_id: int,
@@ -64,7 +82,7 @@ async def read_unassigned_project_scenes(
     """
     try:
         scenes = scene_service.get_scenes_by_project_unassigned(db=db, project_id=project_id, skip=skip,
-                                                                      limit=limit)
+                                                                limit=limit)
         return scenes
     except ValueError as e:  # Project not found
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

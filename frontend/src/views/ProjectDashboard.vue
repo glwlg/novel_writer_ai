@@ -5,7 +5,7 @@
         <h1>我的项目</h1>
       </el-col>
       <el-col :span="12" style="text-align: right;">
-        <el-button type="primary" @click="openCreateForm" :icon="Plus">
+        <el-button type="primary" @click="openCreateDialog" :icon="Plus">
           创建新项目
         </el-button>
       </el-col>
@@ -33,14 +33,14 @@
             :key="project.id"
             :xs="24" :sm="12" :md="8" :lg="6"
         >
-          <ProjectCard :project="project" @delete-project="handleDeleteProject"/>
+          <ProjectCard :project="project" @edit="openEditDialog" @delete="handleDeleteProject"/>
         </el-col>
       </el-row>
     </div>
 
     <!-- Create/Edit Project Dialog -->
     <el-dialog
-        v-model="isFormVisible"
+        v-model="dialogVisible"
         :title="formTitle"
         width="600px"
         :close-on-click-modal="false"
@@ -48,7 +48,7 @@
     >
       <ProjectForm
           ref="projectFormCompRef"
-          :project-to-edit="null"
+          :project-to-edit="currentEditingProject"
           :is-submitting="isSubmittingForm"
           @submit="handleFormSubmit"
           @cancel="handleFormCancel"
@@ -62,14 +62,19 @@ import {ref, onMounted, computed} from 'vue';
 import {useProjectStore} from '@/store/project';
 import ProjectCard from '@/components/project/ProjectCard.vue';
 import ProjectForm from '@/components/project/ProjectForm.vue';
-import {ElDialog, ElButton, ElRow, ElCol, ElAlert, ElEmpty, ElNotification, vLoading} from 'element-plus'; // Auto-imported likely
+import {ElDialog, ElButton, ElRow, ElCol, ElAlert, ElEmpty, ElNotification, vLoading, ElMessage} from 'element-plus'; // Auto-imported likely
 import {Plus} from '@element-plus/icons-vue'; // Import icon
 
 const projectStore = useProjectStore();
 
-const isFormVisible = ref(false);
+const dialogVisible = ref(false);
 const isSubmittingForm = ref(false);
+const isEditMode = ref(false);
 const projectFormCompRef = ref(null); // Ref for the form component instance
+const currentEditingProject = ref(null); // 当前正在编辑的项目
+
+// --- Computed Properties ---
+const projects = computed(() => projectStore.projectsList);
 
 const formTitle = computed(() => '创建新项目');
 
@@ -81,42 +86,63 @@ onMounted(() => {
   }
 });
 
-// --- Form Handling ---
-const openCreateForm = () => {
-  isFormVisible.value = true;
+// 打开创建对话框
+const openCreateDialog = () => {
+  isEditMode.value = false;
+  currentEditingProject.value = null; // 清空编辑数据
+  dialogVisible.value = true;
+};
+
+// 打开编辑对话框
+const openEditDialog = (projectId) => {
+  const projectToEdit = projects.value.find(s => s.id === projectId);
+  if (projectToEdit) {
+    isEditMode.value = true;
+    // 传递普通对象副本，避免直接修改 store 状态
+    currentEditingProject.value = {...projectToEdit};
+    dialogVisible.value = true;
+  } else {
+    ElMessage.warning('找不到要编辑的项目');
+  }
 };
 
 const handleFormCancel = () => {
-  isFormVisible.value = false;
+  dialogVisible.value = false;
 };
 
 const resetFormState = () => {
   // Called when dialog closes
   isSubmittingForm.value = false;
-  // Optional: explicitly reset form if needed, though ProjectForm handles it internally now
-  // projectFormCompRef.value?.resetForm();
 }
-
+// 处理表单提交 (来自 SettingForm 的 'submit' 事件)
 const handleFormSubmit = async (formData) => {
-  isSubmittingForm.value = true;
   try {
-    const newProject = await projectStore.createProject(formData);
-    isFormVisible.value = false;
-    ElNotification({
-      title: '成功',
-      message: `项目 "${newProject.title}" 已创建`,
-      type: 'success',
-    });
-  } catch (error) {
-    // Error is already set in the store, but we can show a notification here
-    ElNotification({
-      title: '创建失败',
-      message: projectStore.error || '无法创建项目，请稍后重试。',
-      type: 'error',
-    });
-    // Keep the form open for correction
-  } finally {
-    isSubmittingForm.value = false;
+    if (isEditMode.value && currentEditingProject.value) {
+      // --- 编辑模式 ---
+      // 准备更新数据 (只包含可更新字段)
+      const updateData = {
+        title: formData.title,
+        logline: formData.logline,
+        global_synopsis: formData.global_synopsis,
+        style: formData.style,
+      };
+      await projectStore.updateProject(currentEditingProject.value.id, updateData);
+      ElMessage.success('设定更新成功！');
+    } else {
+      // --- 创建模式 ---
+      await projectStore.createProject(formData);
+      ElMessage.success('项目创建成功！');
+    }
+    dialogVisible.value = false; // 关闭对话框
+    // (可选) 可以在这里重新获取数据，如果 store 更新不及时
+    // await fetchSettingsData();
+  } catch (err) {
+    const action = isEditMode.value ? '更新' : '创建';
+    console.error(`${action}项目失败:`, err);
+    // 错误信息可能在 store 的 error 状态中，或者从抛出的 err 中获取
+    const errorMsg = projectStore.error || err.message || `项目${action}失败，请稍后重试`;
+    ElMessage.error(errorMsg);
+    // 不关闭对话框，让用户可以修改重试
   }
 };
 

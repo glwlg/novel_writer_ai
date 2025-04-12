@@ -6,11 +6,14 @@ from datetime import datetime
 from .character import CharacterReadMinimal # 示例
 from .setting import SettingElementReadMinimal   # 示例
 from .chapter import ChapterReadMinimal   # 示例
+from .volume import VolumeReadMinimal
+
 
 class ProjectBase(BaseModel):
     title: str
     logline: Optional[str] = None
     global_synopsis: Optional[str] = None
+    style: Optional[str] = None
 
 class ProjectCreate(ProjectBase):
     pass # 创建时只需要 ProjectBase 中的字段
@@ -19,6 +22,7 @@ class ProjectUpdate(BaseModel):
     title: Optional[str] = None
     logline: Optional[str] = None
     global_synopsis: Optional[str] = None
+    style: Optional[str] = None
 
 class ProjectRead(ProjectBase):
     id: int
@@ -27,6 +31,7 @@ class ProjectRead(ProjectBase):
     # 如果需要返回关联数据，可以在这里添加，并确保查询时使用了 joinedload 或 selectinload
     characters: List[CharacterReadMinimal] = []
     setting_elements: List[SettingElementReadMinimal] = []
+    volumes: List[VolumeReadMinimal] = []
     chapters: List[ChapterReadMinimal] = []
 
     model_config = ConfigDict(from_attributes=True)
