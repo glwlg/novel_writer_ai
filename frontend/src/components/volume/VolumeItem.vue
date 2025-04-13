@@ -9,12 +9,14 @@
         <!-- 卷操作按钮组 -->
         <div class="volume-actions">
           <!-- 编辑卷按钮 -->
-          <el-button link type="primary" :icon="Edit" @click.stop="handleEdit" size="default" title="编辑卷信息"></el-button>
+          <el-button link type="primary" :icon="Edit" @click.stop="handleEdit" size="default"
+                     title="编辑卷信息"></el-button>
           <!-- 在本卷新建章节按钮 -->
-          <el-button link type="success" :icon="Plus" @click.stop="handleCreateChapter" size="default" title="在本卷新建章节"></el-button>
+          <el-button link type="success" :icon="Plus" @click.stop="handleCreateChapter" size="default"
+                     title="在本卷新建章节"></el-button>
           <!-- 删除卷确认提示框 -->
           <el-popconfirm
-              title="确定删除此卷吗？卷下的所有章节和场景都将被删除！"
+              :title="`确定删除 ${volume.title} 卷吗？卷下的所有章节和场景都将被删除！`"
               confirm-button-text="确认删除"
               cancel-button-text="取消"
               @confirm="handleDelete"
@@ -46,6 +48,7 @@
           @edit="emitEditChapter"
           @delete="emitDeleteChapter"
           @generate="emitGenerateScenes"
+          @select-scene="emitSceneSelect"
           @generate-scene-content="emitGenerateSceneContent"
       />
     </div>
@@ -53,9 +56,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { ElCollapseItem, ElButton, ElPopconfirm, ElEmpty } from 'element-plus';
-import { Edit, Plus, Delete } from '@element-plus/icons-vue';
+import {computed} from 'vue';
+import {ElCollapseItem, ElButton, ElPopconfirm, ElEmpty} from 'element-plus';
+import {Edit, Plus, Delete} from '@element-plus/icons-vue';
 import ChapterItem from '@/components/chapter/ChapterItem.vue'; // 引入章节项组件
 
 // --- 组件属性定义 ---
@@ -83,6 +86,8 @@ const emit = defineEmits([
   'edit-chapter',       // 转发 ChapterItem 的编辑事件
   'delete-chapter',     // 转发 ChapterItem 的删除事件
   'generate-scenes',    // 转发 ChapterItem 的生成场景事件
+  'generate-scene-content',    // 转发场景内容生成事件
+  'select-scene',    // 转发场景选择事件
   'view-chapter'        // 转发 ChapterItem 的查看内容事件
 ]);
 
@@ -92,7 +97,7 @@ const sortedVolumeChapters = computed(() => {
   // 确保 props.volume.chapters 是一个数组，如果不是或为空则返回空数组
   const chaptersArray = Array.isArray(props.volume.chapters) ? props.volume.chapters : [];
   // 复制数组以避免修改原始数据，然后根据 order 字段排序
-  return [...chaptersArray].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  return [...chaptersArray].sort((a, b) => (b.order ?? 0) - (a.order ?? 0));
 });
 
 // --- 方法 ---
@@ -135,6 +140,9 @@ const emitGenerateScenes = (chapterId) => {
 };
 
 // 转发生成场景事件
+const emitSceneSelect = (sceneId) => {
+  emit('select-scene', sceneId);
+};
 const emitGenerateSceneContent = (sceneId) => {
   emit('generate-scene-content', sceneId);
 };

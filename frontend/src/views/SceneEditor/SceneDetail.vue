@@ -70,10 +70,10 @@
       </el-row>
 
       <SceneContentDisplay
-          :content="sceneContent"
+          :content="sceneStore.activeScene?.generated_content"
           :loading="sceneStore.isLoadingDetails || sceneStore.isGenerating"
           :read-only="false"
-          @update:content="handleContentChange"
+          @update-content="handleContentChange"
           @save-content="saveContentChanges"
           class="content-display-card"
       />
@@ -118,16 +118,6 @@ const pageTitle = computed(() => {
   if (sceneStore.activeScene) return `${'场景' + (sceneStore.activeScene.order_in_chapter + 1) +
   ': ' + sceneStore.activeScene.title || '未命名场景'}`;
   return '场景详情';
-});
-// 将 store 中的 generated_content 同步到本地 ref，并允许本地编辑
-const sceneContent = computed({
-  get: () => sceneStore.activeScene?.generated_content || '',
-  set: (value) => {
-    localSceneContent.value = value; // 更新本地 ref
-    if (value !== (sceneStore.activeScene?.generated_content || '')) {
-      contentHasChanged.value = true; // 标记内容已更改
-    }
-  }
 });
 
 // --- Methods ---

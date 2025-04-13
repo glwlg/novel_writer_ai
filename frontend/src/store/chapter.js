@@ -2,24 +2,29 @@
 import {defineStore} from 'pinia';
 import {chapterAPI} from '@/services/chapterAPI'; // Adjust path
 import {generationAPI} from "@/services/generationAPI.js";
+import {sceneAPI} from "@/services/sceneAPI.js";
 
 export const useChapterStore = defineStore('chapter', {
     state: () => ({
         chapters: [], // List for the current project, potentially enriched with minimal scenes
         activeChapter: null,
         isLoading: false,
+        isLoadingDetails: false,
         isGenerating: false,
         error: null,
+        generationError: null,
         // activeChapter: null, // Optional: If needed for focus
     }),
     actions: {
         _setLoading(type, value) {
             if (type === 'fatch') this.isLoading = value;
+            if (type === 'details') this.isLoadingDetails = value;
             if (type === 'generating') this.isGenerating = value;
         },
         _setError(type, error) {
             const message = error ? (error.response?.data?.detail || error.message) : null;
             if (type === 'fatch') this.error = message;
+            if (type === 'details') this.error = message;
             if (type === 'generating') this.generationError = message;
         },
         clearChapters() {
@@ -40,6 +45,35 @@ export const useChapterStore = defineStore('chapter', {
                 for (const chapter of volume.chapters) {
                     this.chapters.push({...chapter, volume_id: volume.id});
                 }
+            }
+        },
+        async fetchChapterDetail(chapterId) {
+            if (!chapterId) {
+                this.clearActiveChapter();
+                return;
+            }
+            // Prevent re-fetching if already active
+            if (this.activeChapter?.id === chapterId && !this.error) {
+                this._setLoading('details', false);
+                return;
+            }
+
+            this._setLoading('details', true);
+            this._setError('details', null);
+            this.activeChapter = null;
+
+            try {
+                const response = await chapterAPI.getChapter(chapterId);
+                this.activeChapter = response.data;
+                const index = this.chapters.findIndex(ch => ch.id === chapterId);
+                if (index !== -1) {
+                    this.chapters[index] = {...this.chapters[index], ...response.data};
+                }
+            } catch (err) {
+                this._setError('details', err);
+                this.activeChapter = null;
+            } finally {
+                this._setLoading('details', false);
             }
         },
         async fetchChapters(projectId) {
@@ -185,7 +219,10 @@ export const useChapterStore = defineStore('chapter', {
                     // Assuming it returns the full SceneRead schema:
                     this.activeChapter = updatedChapter;
                 }
-
+                const chapterInStore = this.chapters.find(c => c.id === chapterId);
+                if (chapterInStore && updatedChapter) {
+                   chapterInStore.content = updatedChapter.content;
+                }
                 return updatedChapter;
             } catch (err) {
                 this._setError('generating', err);

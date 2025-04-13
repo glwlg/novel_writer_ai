@@ -129,7 +129,12 @@ export const useSceneStore = defineStore('scene', {
             this._setError('details', null);
             try {
                 const response = await sceneAPI.updateScene(sceneId, sceneUpdateData);
+                const index = this.scenes.findIndex(s => s.id === sceneId);
                 const updatedScene = response.data;
+
+                if (index!== -1) {
+                    this.scenes[index] = updatedScene;
+                }
 
                 // Update active scene if it's the one being edited
                 if (this.activeScene?.id === sceneId) {

@@ -55,15 +55,17 @@ const props = defineProps({
 
 // --- Router ---
 const router = useRouter();
-const emit = defineEmits(['generate']);
+const emit = defineEmits(['select','generate']);
 // --- Methods ---
 const goToSceneDetail = () => {
-  if (props.scene && props.scene.id) {
-    router.push({name: 'SceneDetail', params: {sceneId: props.scene.id}}); // 确保路由名称 'SceneDetail' 正确
-  } else {
-    console.error('无法导航：场景 ID 无效');
-    ElMessage.error('无法导航到场景详情，ID 无效');
-  }
+  emit('select', props.scene.id); // Emit chapter ID for scene generation
+
+  // if (props.scene && props.scene.id) {
+  //   router.push({name: 'SceneDetail', params: {sceneId: props.scene.id}}); // 确保路由名称 'SceneDetail' 正确
+  // } else {
+  //   console.error('无法导航：场景 ID 无效');
+  //   ElMessage.error('无法导航到场景详情，ID 无效');
+  // }
 };
 
 // --- Computed ---
@@ -92,12 +94,6 @@ const triggerRAGGeneration = async () => {
 const confirmDeleteScene = async () => {
   if (!props.scene.id) return;
   try {
-    await ElMessageBox.confirm(
-        `确定要永久删除场景 "${props.scene?.title || '此场景'}" 吗？此操作无法撤销。`,
-        '确认删除',
-        {confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'}
-    );
-
     await sceneStore.deleteScene(props.scene.id);
     ElMessage.success('场景已删除');
 

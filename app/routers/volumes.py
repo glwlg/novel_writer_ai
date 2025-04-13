@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas import VolumeCreate, VolumeRead, VolumeUpdate  # Make sure VolumeReadMinimal is imported if used
+from app.schemas import VolumeCreate, VolumeRead, VolumeUpdate, \
+    VolumeReadMinimal  # Make sure VolumeReadMinimal is imported if used
 from app.services import volume_service
 
 router = APIRouter()
@@ -42,7 +43,7 @@ async def create_new_volume(
                             detail=f"Could not create volume. Possible duplicate title or invalid data: {e}")
 
 
-@router.get("/projects/{project_id}/volumes", response_model=List[VolumeRead])  # Use VolumeRead to include chapters
+@router.get("/projects/{project_id}/volumes", response_model=List[VolumeReadMinimal])  # Use VolumeRead to include chapters
 async def read_project_volumes(
         project_id: int,
         skip: int = Query(0, ge=0),
@@ -94,15 +95,15 @@ async def update_existing_volume(
     return updated_volume
 
 
-@router.delete("/volumes/{volume_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_existing_volume(
+@router.delete("/volumes/{volume_id}", response_model=VolumeReadMinimal)
+def delete_existing_volume(
         volume_id: int,
         db: Session = Depends(get_db)
 ):
     """
     Delete a volume by its ID. Associated chapters will also be deleted due to cascade.
     """
-    deleted_volume = await volume_service.delete_volume(db=db, volume_id=volume_id)
+    deleted_volume = volume_service.delete_volume(db=db, volume_id=volume_id)
     if deleted_volume is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Volume not found")
-    return None  # Return No Content on successful deletion
+    return deleted_volume  # Return No Content on successful deletion

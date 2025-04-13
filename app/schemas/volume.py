@@ -39,4 +39,6 @@ class VolumeReadMinimal(BaseModel):
     title: str
     order: int
 
+    chapters: List[ChapterReadMinimal] = []
+
     model_config = ConfigDict(from_attributes=True)

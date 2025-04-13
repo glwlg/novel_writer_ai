@@ -12,9 +12,21 @@
           <el-button link type="primary" :icon="Edit" @click.stop="handleEdit" size="small"/>
         </el-tooltip>
         <!-- Generate Scenes Button -->
-        <el-tooltip :content="chapter.scenes?.length > 0 ? '请先删除已有场景才能重新生成' : '生成场景'" placement="top">
-          <el-button :disabled="!!chapter.scenes?.length" link type="success" :icon="MagicStick"
-                     @click.stop="handleGenerate" size="small"/>
+        <el-tooltip :content="chapter.scenes?.length?'重新生成场景':'生成场景'" placement="top">
+          <div>
+            <el-popconfirm
+                :title="chapter.scenes?.length?'确定生成场景吗？章节下的所有场景会被删除！':'确定生成场景吗？'"
+                confirm-button-text="确认生成"
+                cancel-button-text="取消"
+                @confirm="handleGenerate"
+                width="300"
+                ref="chapterDeleteConfirmRef"
+            >
+              <template #reference>
+                <el-button link type="success" :icon="MagicStick" @click.stop size="small"/>
+              </template>
+            </el-popconfirm>
+          </div>
         </el-tooltip>
         <el-tooltip content="删除章节" placement="top">
           <div>
@@ -43,6 +55,7 @@
         <div v-else class="scene-list-in-chapter">
           <!-- Ensure SceneItem is imported -->
           <SceneItem v-for="scene in sortedScenes" :key="scene.id" :scene="scene"
+                     @select="handleSceneSelect"
                      @generate="handleSceneContentGenerate"
                      class="scene-item-display"/>
         </div>
@@ -71,7 +84,7 @@ const props = defineProps({
 });
 
 // --- Emits ---
-const emit = defineEmits(['select', 'edit', 'delete', 'generate', 'generate-scene-content']);
+const emit = defineEmits(['select', 'edit', 'delete', 'generate', 'select-scene', 'generate-scene-content']);
 
 // --- Computed ---
 // Sort scenes within the component
@@ -98,7 +111,11 @@ const handleGenerate = () => {
 };
 
 const handleSceneContentGenerate = (sceneId) => {
-  emit('generate-scene-content', sceneId); // Emit chapter ID for scene generation
+  emit('generate-scene-content', sceneId);
+};
+
+const handleSceneSelect = (sceneId) => {
+  emit('select-scene', sceneId);
 };
 
 </script>

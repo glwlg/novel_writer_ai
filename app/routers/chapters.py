@@ -56,13 +56,6 @@ async def read_project_chapters(
     """
     try:
         chapters = chapter_service.get_chapters_by_project(db=db, project_id=project_id, skip=skip, limit=limit)
-        for chapter in chapters:
-            if chapter.content is None:
-                chapter.content = ""  # 确保 content 字段不为 None
-                if chapter.scenes:
-                    for scene in chapter.scenes:
-                        if scene.generated_content:
-                            chapter.content += scene.generated_content
         return chapters
     except ValueError as e:  # Project not found from service
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

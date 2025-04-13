@@ -3,7 +3,8 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 # 导入 Scene 的简化 Schema 用于嵌套显示
-from .scene import SceneReadMinimal
+from .scene import SceneReadMinimal, SceneRead
+
 
 class ChapterBase(BaseModel):
     title: str
@@ -32,7 +33,7 @@ class ChapterRead(ChapterBase):
     # 嵌套显示该章节下的场景（简化信息）
     # 注意：需要在获取数据的查询中明确加载 scenes (e.g., using options(selectinload(Chapter.scenes)))
     content: Optional[str] = None # 完整小说内容
-    scenes: List[SceneReadMinimal] = []
+    scenes: List[SceneRead] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,4 +43,5 @@ class ChapterReadMinimal(BaseModel):
     title: str
     order: int
 
+    scenes: List[SceneReadMinimal] = []
     model_config = ConfigDict(from_attributes=True)

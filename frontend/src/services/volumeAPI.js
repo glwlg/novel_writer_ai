@@ -54,7 +54,7 @@ class VolumeAPI {
      */
     deleteVolume = async (volumeId) => {
         // 对于 204 No Content，axios 默认返回 undefined
-        await apiClient.delete(`/volumes/${volumeId}`);
+        return apiClient.delete(`/volumes/${volumeId}`);
     };
 }
 

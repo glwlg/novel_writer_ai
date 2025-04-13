@@ -149,7 +149,7 @@ const handleSubmit = async () => {
         order: formData.value.order,
         summary: formData.value.summary
       };
-      emit('save', {data: payload}); // 不传 ID 表示创建
+      emit('save', {data: payload});
     }
 
   } catch (validationError) {

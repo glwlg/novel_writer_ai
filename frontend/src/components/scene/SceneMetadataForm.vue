@@ -1,33 +1,33 @@
 <template>
   <el-form
-    ref="formRef"
-    :model="formData"
-    :rules="rules"
-    label-position="top"
-    :disabled="loading || isSaving"
-    v-loading="loading"
-    element-loading-text="加载中..."
+      ref="formRef"
+      :model="formData"
+      :rules="rules"
+      label-position="top"
+      :disabled="loading || isSaving"
+      v-loading="loading"
+      element-loading-text="加载中..."
   >
     <el-row :gutter="20">
       <el-col :span="12">
         <el-form-item label="场景标题" prop="title">
-          <el-input v-model="formData.title" placeholder="给场景起个名字（可选）" />
+          <el-input v-model="formData.title" placeholder="给场景起个名字（可选）"/>
         </el-form-item>
       </el-col>
       <el-col :span="12">
-         <el-form-item label="所属章节" prop="chapter_id">
+        <el-form-item label="所属章节" prop="chapter_id">
           <el-select
-            v-model="formData.chapter_id"
-            placeholder="选择章节或留空（未分配）"
-            clearable
-            filterable
-            style="width: 100%;"
+              v-model="formData.chapter_id"
+              placeholder="选择章节或留空（未分配）"
+              clearable
+              filterable
+              style="width: 100%;"
           >
             <el-option
-              v-for="chapter in availableChapters"
-              :key="chapter.id"
-              :label="chapter.title"
-              :value="chapter.id"
+                v-for="chapter in availableChapters"
+                :key="chapter.id"
+                :label="chapter.title"
+                :value="chapter.id"
             />
           </el-select>
         </el-form-item>
@@ -36,43 +36,43 @@
 
     <el-form-item label="场景目标/核心内容" prop="goal">
       <el-input
-        v-model="formData.goal"
-        type="textarea"
-        :rows="3"
-        placeholder="简要描述这个场景需要达成的目标或核心情节"
-        required
+          v-model="formData.goal"
+          type="textarea"
+          :rows="3"
+          placeholder="简要描述这个场景需要达成的目标或核心情节"
+          required
       />
     </el-form-item>
 
     <el-form-item label="场景概要/备注" prop="summary">
       <el-input
-        v-model="formData.summary"
-        type="textarea"
-        :rows="2"
-        placeholder="场景的简短总结或备注（可选）"
+          v-model="formData.summary"
+          type="textarea"
+          :rows="2"
+          placeholder="场景的简短总结或备注（可选）"
       />
     </el-form-item>
 
     <el-row :gutter="20">
-       <el-col :span="12">
-          <el-form-item label="状态" prop="status">
-            <el-select v-model="formData.status" placeholder="选择场景状态" style="width: 100%;">
-              <el-option label="计划中" value="PLANNED" />
-              <el-option label="草稿" value="DRAFTED" />
-              <el-option label="修订中" value="REVISING" />
-              <el-option label="已完成" value="COMPLETED" />
-               <!-- 考虑是否允许手动设置生成中/失败状态 -->
-               <!-- <el-option label="生成中" value="GENERATING" disabled /> -->
-               <!-- <el-option label="生成失败" value="GENERATION_FAILED" disabled /> -->
-            </el-select>
-          </el-form-item>
-       </el-col>
-<!--        <el-col :span="12">-->
-<!--           &lt;!&ndash; 章节内排序，如果需要在此编辑的话 &ndash;&gt;-->
-<!--           <el-form-item label="章节内排序" prop="order_in_chapter">-->
-<!--             <el-input-number :disabled="true" v-model="formData.order_in_chapter" :min="0" controls-position="right" style="width: 100%;" />-->
-<!--           </el-form-item>-->
-<!--        </el-col>-->
+      <el-col :span="12">
+        <el-form-item label="状态" prop="status">
+          <el-select v-model="formData.status" placeholder="选择场景状态" style="width: 100%;">
+            <el-option label="计划中" value="PLANNED"/>
+            <el-option label="草稿" value="DRAFTED"/>
+            <el-option label="修订中" value="REVISING"/>
+            <el-option label="已完成" value="COMPLETED"/>
+            <!-- 考虑是否允许手动设置生成中/失败状态 -->
+            <!-- <el-option label="生成中" value="GENERATING" disabled /> -->
+            <!-- <el-option label="生成失败" value="GENERATION_FAILED" disabled /> -->
+          </el-select>
+        </el-form-item>
+      </el-col>
+      <!--        <el-col :span="12">-->
+      <!--           &lt;!&ndash; 章节内排序，如果需要在此编辑的话 &ndash;&gt;-->
+      <!--           <el-form-item label="章节内排序" prop="order_in_chapter">-->
+      <!--             <el-input-number :disabled="true" v-model="formData.order_in_chapter" :min="0" controls-position="right" style="width: 100%;" />-->
+      <!--           </el-form-item>-->
+      <!--        </el-col>-->
     </el-row>
 
     <el-form-item>
@@ -83,10 +83,10 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue';
-import { useSceneStore } from '@/store/scene'; // 导入 Scene Store
-import { useChapterStore } from '@/store/chapter'; // 导入 Chapter Store 获取章节列表
-import { ElMessage } from 'element-plus';
+import {ref, watch, computed} from 'vue';
+import {useSceneStore} from '@/store/scene'; // 导入 Scene Store
+import {useChapterStore} from '@/store/chapter'; // 导入 Chapter Store 获取章节列表
+import {ElMessage} from 'element-plus';
 
 // --- Props ---
 const props = defineProps({
@@ -99,8 +99,8 @@ const props = defineProps({
     default: false,
   },
   projectId: { // 需要项目ID来获取章节列表
-      type: [String, Number],
-      required: true,
+    type: [String, Number],
+    required: true,
   }
 });
 
@@ -128,7 +128,7 @@ const formData = ref({
 
 // --- Validation Rules ---
 const rules = ref({
-  goal: [{ required: true, message: '场景目标不能为空', trigger: 'blur' }],
+  goal: [{required: true, message: '场景目标不能为空', trigger: 'blur'}],
   // 可以根据需要添加其他规则
 });
 
@@ -152,7 +152,7 @@ watch(() => props.scene, (newScene) => {
     // 如果 scene 变为 null (例如，场景被删除或导航离开)
     resetForm(); // 重置表单
   }
-}, { immediate: true, deep: true }); // immediate: 初始加载时执行一次; deep: 深度监听对象内部变化
+}, {immediate: true, deep: true}); // immediate: 初始加载时执行一次; deep: 深度监听对象内部变化
 
 // --- Methods ---
 const submitForm = async () => {
@@ -172,21 +172,20 @@ const submitForm = async () => {
        order_in_chapter: formData.value.order_in_chapter,
     };
 
-    // 调用 store action 更新场景
-    await sceneStore.updateScene(props.scene.id, updateData);
+    // // 调用 store action 更新场景
+    // await sceneStore.updateScene(props.scene.id, updateData);
 
-    ElMessage.success('场景元数据已保存');
-    emit('updated'); // 通知父组件更新完成
+    emit('save', {id: props.scene.id, data: updateData}); // 通知父组件更新完成
 
   } catch (validationError) {
-      if (validationError === false) { // Element Plus validate promise rejects with false if validation fails
-        console.log('表单验证失败');
-        ElMessage.warning('请检查表单输入');
-      } else {
-        console.error('保存场景失败:', validationError);
-        // 错误信息已在 store 中处理，这里可以不显示，或者显示通用错误
-        // ElMessage.error(`保存失败: ${sceneStore.error || '未知错误'}`);
-      }
+    if (validationError === false) { // Element Plus validate promise rejects with false if validation fails
+      console.log('表单验证失败');
+      ElMessage.warning('请检查表单输入');
+    } else {
+      console.error('保存场景失败:', validationError);
+      // 错误信息已在 store 中处理，这里可以不显示，或者显示通用错误
+      // ElMessage.error(`保存失败: ${sceneStore.error || '未知错误'}`);
+    }
   } finally {
     isSaving.value = false;
   }
@@ -194,15 +193,15 @@ const submitForm = async () => {
 
 const resetForm = () => {
   if (props.scene) {
-     // 重置为 props 传入的原始数据
-     formData.value = {
-       title: props.scene.title || '',
-       goal: props.scene.goal || '',
-       summary: props.scene.summary || '',
-       status: props.scene.status || 'PLANNED',
-       chapter_id: props.scene.chapter_id || null,
-       order_in_chapter: props.scene.order_in_chapter ?? 0,
-     };
+    // 重置为 props 传入的原始数据
+    formData.value = {
+      title: props.scene.title || '',
+      goal: props.scene.goal || '',
+      summary: props.scene.summary || '',
+      status: props.scene.status || 'PLANNED',
+      chapter_id: props.scene.chapter_id || null,
+      order_in_chapter: props.scene.order_in_chapter ?? 0,
+    };
   } else {
     // 如果没有原始 scene 数据，则清空
     formData.value = {
@@ -218,6 +217,6 @@ const resetForm = () => {
 <style scoped>
 /* 可以添加一些样式 */
 .el-form-item {
-    margin-bottom: 18px;
+  margin-bottom: 18px;
 }
 </style>
